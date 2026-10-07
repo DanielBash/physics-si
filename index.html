@@ -1,0 +1,1101 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Физика с Си</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600&family=Literata:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* layout: ночное небо; Си слева, лист с задачей по центру, ответ под ним; всё остальное — в выезжающих панелях */
+:root{
+  --sky:#0a0d26; --sky2:#171b4a; --panel:rgba(19,23,60,.78); --panel2:rgba(40,46,104,.55); --line:rgba(170,178,255,.18);
+  --ink:#eceafe; --muted:#a8aad8; --faint:#6f73a8;
+  --comet:#ffbf69; --comet-ink:#2b1a04; --iris:#7fd8ff; --good:#7fe0a8; --bad:#ff8193; --warn:#ffd36b;
+  --f-display:"Unbounded",system-ui,sans-serif; --f-body:"Onest",system-ui,sans-serif;
+  --f-read:"Literata",Georgia,serif; --f-mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--ink);font:15px/1.5 var(--f-body);
+  background:radial-gradient(ellipse 70% 50% at 15% 0%,#26215e 0,transparent 70%),radial-gradient(ellipse 60% 50% at 95% 100%,#122a5c 0,transparent 70%),var(--sky);background-attachment:fixed}
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--iris);outline-offset:2px;border-radius:8px}
+.app{position:relative;z-index:1;min-height:100%;display:flex;flex-direction:column;padding-inline:16px}
+.top{display:flex;align-items:center;gap:14px;width:100%;max-width:1180px;margin-inline:auto;padding-block:14px}
+.brand{font:700 15px var(--f-display);letter-spacing:.02em;display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+.brand b{color:var(--iris);font-weight:700}
+.brand span{color:var(--muted);font-weight:500}
+.hours{margin-left:auto;font:600 13px var(--f-mono);color:var(--comet);white-space:nowrap;font-variant-numeric:tabular-nums}
+.nav{display:flex;gap:4px}
+.nav button{display:flex;align-items:center;gap:6px;background:none;border:1px solid transparent;border-radius:10px;padding:7px 10px;color:var(--muted);font-size:14px}
+.nav button:hover{color:var(--ink);border-color:var(--line);background:var(--panel2)}
+.nav svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media (max-width:620px){.nav span{display:none}.nav button{padding:8px}}
+
+.stage{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:780px;margin-inline:auto;padding-block:6px 48px;flex:1}
+.si{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%}
+.avatar{position:relative;width:min(180px,46vw);aspect-ratio:1;border-radius:30px;overflow:hidden;background:var(--sky2);border:1px solid rgba(127,216,255,.35);box-shadow:0 0 0 6px rgba(127,216,255,.06),0 18px 60px rgba(70,80,220,.4)}
+.avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity .25s}
+.avatar img.off{opacity:0}
+.avatar .tag{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font:700 11px var(--f-display);letter-spacing:.14em;background:rgba(10,13,38,.78);border:1px solid var(--line);padding:2px 10px;border-radius:99px;color:var(--iris)}
+.bubble{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 16px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);position:relative;min-width:0}
+.bubble::before{content:"";position:absolute;top:-7px;left:50%;margin-left:-6px;width:12px;height:12px;background:inherit;border-left:1px solid var(--line);border-top:1px solid var(--line);transform:rotate(45deg)}
+.who{font:600 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--iris);margin-bottom:4px}
+.say{margin:0;overflow-wrap:anywhere;font-size:15.5px}
+.chatlog{display:flex;flex-direction:column;gap:8px;max-height:min(50vh,460px);overflow:auto;margin-top:8px}
+.chatlog:empty{display:none}
+.msg{padding:8px 10px;border-radius:12px;background:var(--panel2);overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:rgba(255,191,105,.14);border:1px solid rgba(255,191,105,.25);max-width:90%}
+.msg.tool{background:none;border:1px dashed rgba(127,216,255,.35);color:var(--iris);font-size:13px}
+.choices{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.choices:empty{display:none}
+.quick{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.quick button{border:1px solid var(--line);background:rgba(10,13,38,.55);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--muted)}
+.quick button:hover{color:var(--ink);border-color:rgba(127,216,255,.45)}
+.quick button:disabled{opacity:.4;cursor:default}
+.chat{display:flex;gap:6px;width:100%}
+.chat input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
+.chat input::placeholder{color:var(--faint)}
+.chat button{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:0 12px}
+.work{display:flex;flex-direction:column;gap:14px;min-width:0;width:100%}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center}
+.chip{font:500 12px var(--f-mono);padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:rgba(10,13,38,.5);white-space:nowrap}
+.chip.why{color:var(--comet);border-color:rgba(255,191,105,.35)}
+.chip.side{color:var(--iris);border-color:rgba(127,216,255,.4)}
+.chip.heat{color:#ffd9a0;border-color:rgba(255,191,105,.5);background:rgba(255,191,105,.1)}
+.sheet-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px 30px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+@media (max-width:620px){.sheet-card{padding:18px}}
+.ptitle{font:600 13px var(--f-display);letter-spacing:.04em;color:var(--muted);margin:0 0 12px;text-wrap:balance}
+.ptext{font:400 1.1rem/1.65 var(--f-read);overflow-wrap:anywhere}
+.ptext mjx-container{font-size:105%!important}
+.intro{font:400 1rem/1.6 var(--f-read);border:1px dashed rgba(127,216,255,.45);border-radius:14px;padding:12px 16px;margin-bottom:16px;background:rgba(127,216,255,.06)}
+.intro .lab{font:600 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--iris);display:block;margin-bottom:4px}
+.fig{margin-top:14px;max-width:100%;text-align:center}
+.fig img{max-height:260px}
+.note{font-size:13px;color:var(--faint);margin-top:12px}
+.answer{display:flex;flex-direction:column;gap:10px}
+.arow{display:flex;gap:8px;align-items:stretch}
+.arow textarea{flex:1;min-width:0;resize:vertical;min-height:52px;background:rgba(10,13,38,.7);border:1px solid var(--line);border-radius:14px;padding:13px 15px;font:500 17px var(--f-mono)}
+.arow textarea:focus{border-color:var(--iris);outline:none}
+.unit{display:flex;align-items:center;padding:0 12px;border:1px solid var(--line);border-radius:14px;font:500 14px var(--f-mono);color:var(--muted);white-space:nowrap}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:10px 16px;font-weight:500}
+.btn:hover{border-color:rgba(170,178,255,.4)}
+.btn.primary{background:var(--comet);color:var(--comet-ink);border-color:var(--comet);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.quiet{background:none;color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:default}
+.reveal{display:flex;flex-direction:column;gap:12px}
+.reveal:empty{display:none}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 20px}
+.box h4{margin:0 0 6px;font:600 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.box.trick{border-color:rgba(127,216,255,.4);background:linear-gradient(135deg,rgba(127,216,255,.1),rgba(19,23,60,.8))}
+.box.trick h4{color:var(--iris)}
+.box.trick b{font:600 16px var(--f-display);display:block;margin-bottom:4px}
+.box .read{font:400 1rem/1.65 var(--f-read)}
+.verdict-ok{color:var(--good)}.verdict-bad{color:var(--bad)}
+.loading{display:flex;align-items:center;gap:12px;color:var(--muted);font-family:var(--f-read);font-size:1.05rem}
+.orbit{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--comet);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* выезжающая панель */
+.drawer{position:fixed;inset:0;z-index:10}
+.scrim{position:absolute;inset:0;background:rgba(5,6,20,.55);backdrop-filter:blur(2px)}
+.panel{position:absolute;top:0;right:0;bottom:0;width:min(560px,100%);background:#11143a;border-left:1px solid var(--line);display:flex;flex-direction:column;animation:slide .22s ease-out}
+@keyframes slide{from{transform:translateX(30px);opacity:0}}
+.panel header{display:flex;align-items:center;gap:10px;padding:16px 20px calc(10px);padding-top:calc(16px + env(safe-area-inset-top,0px))}
+.panel h2{margin:0;font:700 18px var(--f-display);flex:1}
+.x{background:none;border:1px solid var(--line);border-radius:10px;width:34px;height:34px;font-size:18px;color:var(--muted)}
+.tabs{display:flex;gap:4px;padding:0 20px 10px}
+.tabs:empty{display:none}
+.tabs button{background:none;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--sky);border-color:var(--ink)}
+.dbody{overflow:auto;padding:4px 20px calc(30px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px}
+.dbody h3{margin:0;font:600 17px var(--f-display);text-wrap:balance}
+.dbody h4{margin:0 0 8px;font:600 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font:600 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--comet)}
+.now{background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:16px}
+.now p{margin:4px 0 0;color:var(--muted)}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.list li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:14px}
+.list .n{font:500 12px var(--f-mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.list .lock{color:var(--faint)}
+.bar{height:6px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--iris);border-radius:99px}
+.bar.c i{background:var(--comet)}
+.pct{font:500 12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;min-width:36px}
+details.sec{border-top:1px solid var(--line);padding-top:8px}
+details.sec summary{cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) 80px 40px;gap:10px;align-items:center;padding:4px 0;list-style:none}
+details.sec summary::-webkit-details-marker{display:none}
+.skrow{display:grid;grid-template-columns:minmax(0,1fr) 80px 40px;gap:10px;align-items:center;font-size:14px;padding:3px 0 3px 12px;color:var(--muted)}
+.skrow.on{color:var(--ink)}
+.small{font-size:13px;color:var(--muted)}
+.rules{background:rgba(255,191,105,.07);border:1px solid rgba(255,191,105,.25);border-radius:14px;padding:12px 14px;font-size:14px}
+.rules ul{margin:6px 0 0;padding-left:18px}
+.oly{border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+.oly.marked{border-color:rgba(255,191,105,.55)}
+.oly.off{opacity:.55}
+.oly summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center}
+.oly summary::-webkit-details-marker{display:none}
+.oname{font-weight:600}
+.lvl{font:600 11px var(--f-mono);border-radius:6px;padding:1px 6px;margin-left:6px;border:1px solid var(--line);color:var(--muted);vertical-align:2px}
+.lvl.l1{color:var(--comet);border-color:rgba(255,191,105,.5)}
+.lvl.lv{color:var(--iris);border-color:rgba(127,216,255,.5)}
+.onext{grid-column:1;font-size:13px;color:var(--muted)}
+.onext b{color:var(--ink);font-weight:500}
+.onext .soon{color:var(--warn)}
+.mark{grid-row:1/3;grid-column:2;border:1px solid var(--line);background:none;border-radius:10px;padding:6px 10px;font-size:13px;color:var(--muted);white-space:nowrap}
+.mark[aria-pressed="true"]{background:var(--comet);color:var(--comet-ink);border-color:var(--comet);font-weight:600}
+.obody{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.stages{width:100%;border-collapse:collapse;font-size:13px}
+.stages td{padding:4px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.stages td:first-child{font-family:var(--f-mono);white-space:nowrap;padding-right:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stages tr.past td{opacity:.45}
+.obody ul{margin:0;padding-left:18px}
+.obody a{color:var(--iris)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:480px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.stat b{display:block;font:600 20px var(--f-mono);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.vbox{border-radius:14px;padding:12px 14px;border:1px solid var(--line);font-family:var(--f-read)}
+.vbox.bad{border-color:rgba(255,129,147,.5);background:rgba(255,129,147,.08)}
+.vbox.warn{border-color:rgba(255,211,107,.45);background:rgba(255,211,107,.07)}
+.vbox.good{border-color:rgba(127,224,168,.45);background:rgba(127,224,168,.07)}
+.calwrap{overflow-x:auto}
+.cal{display:grid;grid-template-rows:repeat(7,12px);grid-auto-flow:column;grid-auto-columns:12px;gap:3px}
+.cal i{border-radius:3px;background:rgba(255,255,255,.06)}
+.cal i.l1{background:rgba(255,191,105,.28)}.cal i.l2{background:rgba(255,191,105,.5)}.cal i.l3{background:rgba(255,191,105,.75)}.cal i.l4{background:var(--comet)}
+.cal i.fut{background:none}
+.legend{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--faint);margin-top:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.solved{display:flex;flex-direction:column;gap:8px}
+.solved details{border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.solved summary{list-style:none;cursor:pointer;padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px}
+.solved summary::-webkit-details-marker{display:none}
+.solved .d{font-size:12px;color:var(--faint);font-family:var(--f-mono)}
+.res{font:500 12px var(--f-mono);border-radius:99px;padding:2px 8px;align-self:center;grid-row:1/3;grid-column:2}
+.res.first{color:var(--good);border:1px solid rgba(127,224,168,.4)}
+.res.help{color:var(--warn);border:1px solid rgba(255,211,107,.4)}
+.res.gave{color:var(--bad);border:1px solid rgba(255,129,147,.4)}
+.solved .read{padding:0 12px 12px;font:400 15px/1.6 var(--f-read)}
+.tier{display:flex;flex-direction:column;gap:8px}
+.tier label{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer}
+.tier label:has(input:checked){border-color:var(--iris);background:rgba(127,216,255,.07)}
+.notes li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.notes button{background:none;border:none;color:var(--faint)}
+.empty{color:var(--muted);font-family:var(--f-read);border:1px dashed var(--line);border-radius:14px;padding:14px}
+
+.box.lesson{border-color:rgba(127,216,255,.35)}
+.box.lesson h4{color:var(--iris)}
+.box.lesson summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:10px}
+.box.lesson summary::-webkit-details-marker{display:none}
+.planbtns{display:flex;flex-wrap:wrap;gap:8px}
+.sireply{border:1px solid rgba(127,216,255,.35);border-radius:14px;padding:12px 14px;font-family:var(--f-read)}
+.tagc{font:500 11px var(--f-mono);color:var(--iris);border:1px solid rgba(127,216,255,.4);border-radius:6px;padding:0 5px;margin-left:6px}
+.key{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-family:var(--f-mono)}
+[hidden]:not([hidden=until-found i]){display:none!important}img{max-width:100%}
+@media (prefers-reduced-motion:reduce){.panel{animation:none}.avatar img{transition:none}}
+</style>
+</head><body>
+
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="app">
+  <header class="top">
+    <div class="brand"><b>Си</b><span>· физика</span></div>
+    <div class="hours" id="hours" title="Время занятий">0 ч</div>
+    <nav class="nav">
+      <button data-open="plan" aria-label="План"><svg viewBox="0 0 24 24"><path d="M4 6h10M4 12h16M4 18h7"/></svg><span>План</span></button>
+      <button data-open="progress" aria-label="Прогресс"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Прогресс</span></button>
+      <button data-open="solved" aria-label="Решённые"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 12l3 3 5-6"/></svg><span>Решённые</span></button>
+      <button data-open="settings" aria-label="Настройки"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Настройки</span></button>
+    </nav>
+  </header>
+
+  <main class="stage">
+    <aside class="si">
+      <div class="avatar"><img id="siImg" src="si/watch.webp" alt="Си смотрит на тебя"><span class="tag">СИ</span></div>
+      <div class="bubble" aria-live="polite">
+        <div class="who">Си</div>
+        <p class="say" id="say">Сейчас, только очки протру…</p>
+        <div class="choices" id="choices"></div>
+        <div class="chatlog" id="chatlog"></div>
+      </div>
+      <div class="quick" id="quick">
+        <button type="button" data-q="lesson">Объясни тему</button>
+        <button type="button" data-q="start">С чего начать?</button>
+        <button type="button" data-q="steps" hidden>Разбери по шагам</button>
+        <button type="button" data-q="dunno">Я этого не знаю</button>
+      </div>
+      <form class="chat" id="chatForm" autocomplete="off">
+        <input id="chatIn" placeholder="Спросить Си про эту задачу" aria-label="Вопрос Си про эту задачу">
+        <button aria-label="Отправить">→</button>
+      </form>
+    </aside>
+
+    <section class="work">
+      <div class="meta" id="meta"></div>
+      <div id="lesson"></div>
+      <article class="sheet-card" id="problem"></article>
+      <form class="answer" id="answerForm" autocomplete="off">
+        <div class="arow">
+          <textarea id="answer" rows="1" placeholder="Ответ" aria-label="Ответ"></textarea>
+          <div class="unit" id="unit" hidden></div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="checkBtn">Проверить</button>
+          <button type="button" class="btn" id="hintBtn">Подсказка</button>
+          <button type="button" class="btn quiet" id="disputeBtn" hidden>Мой ответ верный</button>
+          <button type="button" class="btn quiet" id="giveBtn">Сдаюсь</button>
+          <button type="button" class="btn primary" id="nextBtn" hidden>Следующая задача</button>
+        </div>
+      </form>
+      <div class="reveal" id="reveal"></div>
+    </section>
+  </main>
+</div>
+
+<div class="drawer" id="drawer" hidden>
+  <div class="scrim" data-act="close"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+    <header><h2 id="dTitle"></h2><button class="x" data-act="close" aria-label="Закрыть">×</button></header>
+    <div class="tabs" id="dTabs" role="tablist"></div>
+    <div class="dbody" id="dBody"></div>
+  </div>
+</div>
+
+<script>
+window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],processEscapes:true},svg:{fontCache:'global'},startup:{typeset:false}};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" async></script>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const DAY=864e5, EGE_DATE=new Date(2028,5,1).getTime();
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:0;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=s=>esc(s).replace(/^#{1,4}\s*(.+)$/gm,'<b>$1</b>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+const dkey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>dkey(new Date());
+const pdate=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const rdate=s=>pdate(s).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}).replace('.','');
+const grade=()=>Date.now()>=new Date(2027,8,1).getTime()?11:10;
+const plural=(n,a,b,c)=>{n=Math.abs(n)%100;const k=n%10;return n>10&&n<20?c:k===1?a:k>=2&&k<=4?b:c};
+const fmtMin=m=>m<60?Math.round(m)+' мин':(m/60).toFixed(1).replace('.',',')+' ч';
+const typeset=el=>{try{window.MathJax?.typesetPromise?.([el]).catch(()=>{})}catch{}};
+
+/* ---------- программа ---------- */
+const SECTIONS={mech:'Механика',mkt:'Молекулярная физика и термодинамика',el:'Электростатика и постоянный ток',mag:'Магнетизм, индукция, ЭМ-колебания',opt:'Оптика',qua:'СТО и квантовая физика',meth:'Методы и эксперимент',oly:'Олимпиадные темы'};
+// порядок = порядок плана по умолчанию. e — номера заданий ЕГЭ, p — что нужно знать до
+const SK=[
+ {id:'m1',s:'mech',g:10,n:'Равномерное и равноускоренное движение',e:[1,22,26],p:[]},
+ {id:'m2',s:'mech',g:10,n:'Свободное падение и бросок под углом',e:[1,22,26],p:['m1']},
+ {id:'m3',s:'mech',g:10,n:'Движение по окружности, относительность движения',e:[1,5,26],p:['m1']},
+ {id:'z1',s:'oly',g:10,n:'Оценки и анализ размерностей',e:[],p:['m1']},
+ {id:'m4',s:'mech',g:10,n:'Законы Ньютона; силы тяжести, упругости, трения',e:[2,5,22],p:['m1']},
+ {id:'x1',s:'meth',g:10,n:'Показания приборов и погрешности',e:[19],p:[]},
+ {id:'m5',s:'mech',g:10,n:'Системы тел: связанные тела, блоки, наклонная плоскость',e:[2,22,26],p:['m4']},
+ {id:'z4',s:'oly',g:10,n:'Кинематические связи',e:[],p:['m5']},
+ {id:'m6',s:'mech',g:10,n:'Всемирное тяготение, спутники, вес и невесомость',e:[2,6],p:['m3','m4']},
+ {id:'z2',s:'oly',g:10,n:'Неинерциальные системы отсчёта',e:[],p:['m5','m3']},
+ {id:'m7',s:'mech',g:10,n:'Импульс и закон его сохранения',e:[3,22,26],p:['m4']},
+ {id:'m8',s:'mech',g:10,n:'Работа, мощность, закон сохранения энергии',e:[3,6,22,26],p:['m4']},
+ {id:'m9',s:'mech',g:10,n:'Статика: моменты сил, равновесие, центр масс',e:[4,26],p:['m4']},
+ {id:'z3',s:'oly',g:10,n:'Вращение твёрдого тела',e:[],p:['m9','m8']},
+ {id:'m10',s:'mech',g:10,n:'Гидростатика: давление, закон Архимеда',e:[4,6,26],p:['m4']},
+ {id:'x2',s:'meth',g:10,n:'Планирование эксперимента',e:[20],p:['m4']},
+ {id:'m11',s:'mech',g:10,n:'Механические колебания: маятники и пружины',e:[4,5,6],p:['m8']},
+ {id:'m12',s:'mech',g:10,n:'Механические волны и звук',e:[4,6],p:['m11']},
+ {id:'t1',s:'mkt',g:10,n:'Основы МКТ: количество вещества, давление газа',e:[7,9],p:[]},
+ {id:'t2',s:'mkt',g:10,n:'Уравнение Менделеева–Клапейрона, изопроцессы',e:[7,9,10,23,24],p:['t1']},
+ {id:'t3',s:'mkt',g:10,n:'Насыщенный пар и влажность',e:[8,10,24],p:['t2']},
+ {id:'t4',s:'mkt',g:10,n:'Количество теплоты, тепловой баланс, фазовые переходы',e:[8,10,23,24],p:['t1']},
+ {id:'t5',s:'mkt',g:10,n:'Первый закон термодинамики, работа газа',e:[8,9,10,23,24],p:['t2','t4']},
+ {id:'t6',s:'mkt',g:10,n:'Тепловые машины, КПД, цикл Карно',e:[8,9,24],p:['t5']},
+ {id:'e1',s:'el',g:10,n:'Закон Кулона, напряжённость, суперпозиция',e:[11,14,25],p:['m4']},
+ {id:'e2',s:'el',g:10,n:'Потенциал, работа поля, проводники и диэлектрики',e:[11,14,15,25],p:['e1','m8']},
+ {id:'e3',s:'el',g:10,n:'Конденсаторы и энергия электрического поля',e:[11,15,25],p:['e2']},
+ {id:'e4',s:'el',g:10,n:'Закон Ома, соединения проводников',e:[11,14,15,25],p:[]},
+ {id:'z5',s:'oly',g:10,n:'Симметрия и бесконечные цепи',e:[],p:['e4']},
+ {id:'e5',s:'el',g:10,n:'ЭДС, закон Ома для полной цепи, работа и мощность тока',e:[11,15,21,25],p:['e4']},
+ {id:'b1',s:'mag',g:11,n:'Магнитное поле, сила Ампера',e:[12,14,21],p:['e5']},
+ {id:'b2',s:'mag',g:11,n:'Сила Лоренца, движение заряженных частиц',e:[12,15,25],p:['b1','m3']},
+ {id:'b3',s:'mag',g:11,n:'Электромагнитная индукция, правило Ленца',e:[12,14,21,25],p:['b1']},
+ {id:'b4',s:'mag',g:11,n:'Самоиндукция, энергия магнитного поля',e:[12,15,25],p:['b3']},
+ {id:'b5',s:'mag',g:11,n:'Колебательный контур',e:[12,15,25],p:['b4','m11','e3']},
+ {id:'b6',s:'mag',g:11,n:'Переменный ток, трансформатор, ЭМ-волны',e:[12,15],p:['b5']},
+ {id:'o1',s:'opt',g:11,n:'Отражение, преломление, полное внутреннее отражение',e:[13,14,25],p:[]},
+ {id:'o2',s:'opt',g:11,n:'Линзы и построение изображений',e:[13,15,21,25],p:['o1']},
+ {id:'o3',s:'opt',g:11,n:'Интерференция, дифракция, решётка',e:[13,15],p:['m12']},
+ {id:'q0',s:'qua',g:11,n:'Основы СТО',e:[18],p:['m8']},
+ {id:'q1',s:'qua',g:11,n:'Фотоны и фотоэффект',e:[16,17],p:['e2']},
+ {id:'q2',s:'qua',g:11,n:'Атом Бора и спектры',e:[16,17],p:['q1']},
+ {id:'q3',s:'qua',g:11,n:'Радиоактивность и закон распада',e:[16,17],p:[]},
+ {id:'q4',s:'qua',g:11,n:'Ядерные реакции и энергия связи',e:[16,17],p:['q3','q0']},
+];
+// идеи за рамками программы: вплетаются в обычные задачи, когда ученик в ударе
+const SQ=[
+ {id:'sq1',n:'Производная как скорость изменения',p:['m1']},
+ {id:'sq2',n:'Площадь под графиком и интеграл',p:['m1']},
+ {id:'sq3',n:'Непрямоугольные (косые) оси координат',p:['m2','m4']},
+ {id:'sq10',n:'Угловая скорость как вектор, полярные координаты',p:['m3']},
+ {id:'sq8',n:'Система центра масс',p:['m7']},
+ {id:'sq11',n:'Скалярное произведение и работа',p:['m8']},
+ {id:'sq4',n:'Векторное произведение и момент силы',p:['m9']},
+ {id:'sq5',n:'Малые приближения: (1+x)ⁿ ≈ 1+nx, sin x ≈ x',p:['m6']},
+ {id:'sq6',n:'Уравнение колебаний: x″ = −ω²x',p:['m11','sq1']},
+ {id:'sq15',n:'Распределение молекул по скоростям (на пальцах)',p:['t1']},
+ {id:'sq7',n:'Экспонента: остывание, разрядка, распад',p:['t4','sq1']},
+ {id:'sq16',n:'Энтропия без страха',p:['t6']},
+ {id:'sq13',n:'Метод изображений в электростатике',p:['e2']},
+ {id:'sq12',n:'Графический метод для нелинейных элементов',p:['e4']},
+].map(q=>({...q,s:'side',g:10,e:[],side:true}));
+const DIAG=['m1','m4','m5','m7','m8','m9','t2','t4','t5','e1','e4'];
+const EGE={1:'краткий ответ числом, базовый уровень, кинематика',2:'краткий ответ числом, базовый, динамика и силы',3:'краткий ответ числом, базовый, импульс и энергия',4:'краткий ответ числом, базовый, статика, гидростатика, колебания и волны',5:'выбор двух верных утверждений из пяти о механическом процессе по графику/таблице/описанию; ответ — две цифры',6:'как изменятся величины (1 — увеличится, 2 — уменьшится, 3 — не изменится) или соответствие график↔величина; механика; ответ — последовательность цифр',7:'краткий ответ числом, МКТ',8:'краткий ответ числом, термодинамика',9:'выбор двух верных утверждений, МКТ и термодинамика',10:'изменение величин или соответствие, МКТ и термодинамика',11:'краткий ответ числом, электростатика и постоянный ток',12:'краткий ответ числом, магнетизм, индукция, колебания',13:'краткий ответ числом, оптика',14:'выбор двух верных утверждений, электродинамика',15:'изменение величин или соответствие, электродинамика',16:'краткий ответ числом, квантовая и ядерная физика',17:'изменение величин или соответствие, квантовая физика',18:'выбор верных утверждений о законах из разных разделов',19:'запись показаний прибора с погрешностью (половина цены деления), ответ строкой вида 2.4±0.1',20:'выбор двух опытов/установок для проверки гипотезы; ответ — две цифры',21:'качественная задача по электродинамике: объяснить явление, опираясь на законы; развёрнутый ответ',22:'расчётная задача по механике с заданной моделью, повышенный уровень',23:'расчётная задача по МКТ и термодинамике, повышенный уровень',24:'расчётная задача по МКТ и термодинамике, высокий уровень',25:'расчётная задача по электродинамике, высокий уровень',26:'расчётная задача по механике, высокий уровень, с обоснованием применимости законов'};
+
+const STARTER={id:'start',skill:'m1',why:'start',task:1,d:3,title:'Средняя скорость',
+ hello:'Разминка. Если скажешь «50», я сделаю вид, что не слышала.',
+ text:'Автомобиль проехал первую половину пути со скоростью $v_1 = 60$ км/ч, а вторую половину — со скоростью $v_2 = 40$ км/ч. Найдите среднюю скорость на всём пути.',
+ type:'num',answer:48,unit:'км/ч',tol:.01,hint:'Средняя скорость — это весь путь, делённый на всё время. Обозначь половину пути через $s$ и найди время на каждой половине.',
+ solution:'Пусть каждая половина пути равна $s$. Время в пути: $t=\\frac{s}{v_1}+\\frac{s}{v_2}$.\nСредняя скорость: $v=\\frac{2s}{t}=\\frac{2v_1v_2}{v_1+v_2}=\\frac{2\\cdot60\\cdot40}{100}=48$ км/ч.',
+ trick:{name:'Среднее гармоническое',idea:'При равных отрезках пути средняя скорость равна среднему гармоническому скоростей, а не среднему арифметическому. Медленный участок «весит» больше, потому что на нём проводишь больше времени.'}};
+
+/* ---------- состояние ---------- */
+const freshProg=()=>({order:null,custom:[],skip:{},queue:[]});
+const fresh=()=>({v:2,set:{tier:'default'},sk:{},hist:[],tricks:[],notes:[],oly:{},days:{},total:0,sess:{t:0,n:0,ok:0},cur:null,next:null,solvedN:0,prog:freshProg(),diag:null,start:null});
+let S=fresh(), sample=null, toolsOK=false, OLY=[], RULES=null, ready=false, greeted=false;
+const newProblem=p=>({tries:[],hint:false,spent:0,status:'open',chat:[],created:Date.now(),...p});
+const byId=id=>SK.find(k=>k.id===id)||S.prog.custom.find(k=>k.id===id)||SQ.find(k=>k.id===id);
+function PLAN(all){
+ const base=[...SK,...S.prog.custom];
+ const order=S.prog.order?S.prog.order.map(byId).filter(k=>k&&!k.side):[];
+ for(const k of base) if(!order.includes(k)) order.push(k);
+ return all?order:order.filter(k=>!S.prog.skip[k.id]);
+}
+
+const LS={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const store={
+ async load(){return LS.get('si-state',null)},
+ async save(st){LS.set('si-state',st)},
+ async addSolved(p){const a=LS.get('si-solved',[]);a.unshift(p);LS.set('si-solved',a.slice(0,60))},
+ async listSolved(){return LS.get('si-solved',[])},
+ async getLesson(id){return LS.get('si-lesson-'+id,null)},
+ async putLesson(id,text){LS.set('si-lesson-'+id,text)}
+};
+let saveT=0, saving=false, dirty=false;
+function save(now){dirty=true;clearTimeout(saveT);saveT=setTimeout(flush,now?250:30000)}
+async function flush(){
+ if(!ready||saving||!dirty) return;
+ saving=true;dirty=false;
+ try{await store.save(S)}catch(e){dirty=true;console.warn('save',e)}
+ saving=false;
+ if(dirty) save(true);
+}
+
+/* ---------- модель ученика ---------- */
+const elo=(r,D)=>1/(1+10**((D-r)/400));
+function prior(){const st=Object.values(S.sk).filter(s=>s.n>=3);return Math.max(850,(st.length?avg(st.map(s=>s.r)):1000)-100)}
+function sk(id){return S.sk[id]||(S.sk[id]={r:prior(),n:0,ok:0,last:0,due:0,iv:0})}
+function mastery(id){const s=S.sk[id];if(!s||!s.n)return 0;return clamp((s.r-800)/700,0,1)*(.6+.4*Math.min(1,s.n/4))}
+const introduced=k=>{const s=S.sk[k.id];return !!s&&s.n>=2&&mastery(k.id)>=.55};
+const unlocked=k=>k.p.every(p=>!byId(p)||S.prog.skip[p]||(S.sk[p]?.n>=2&&mastery(p)>=.35));
+const frontier=()=>PLAN().find(k=>!introduced(k)&&unlocked(k)&&(S.sk[k.id]?.n||0)<6);
+const sessionHeat=()=>Math.min(3,Math.floor((S.sess.ok||0)/3));
+function ancestors(id,acc=new Set()){for(const p of byId(id)?.p||[]) if(!acc.has(p)){acc.add(p);ancestors(p,acc)} return [...acc]}
+
+function nextEvent(o){
+ const t0=pdate(today()).getTime();
+ for(const st of (o.stages||[]).filter(s=>s.k!=='info')){
+  const end=pdate(st.to||st.from).getTime();
+  if(end>=t0) return {st,at:Math.max(pdate(st.from).getTime(),t0),days:Math.round((Math.max(pdate(st.from).getTime(),t0)-t0)/DAY),now:pdate(st.from).getTime()<=t0};
+ }
+ return null;
+}
+function nextRoundAfter(o){
+ const t0=pdate(today()).getTime();
+ const st=(o.stages||[]).find(s=>(s.k==='round'||s.k==='final')&&pdate(s.to||s.from).getTime()>=t0);
+ return st?{st,days:Math.max(0,Math.round((pdate(st.from).getTime()-t0)/DAY))}:null;
+}
+function olyReadiness(o){const ks=(o.focus||[]).map(byId).filter(k=>k&&k.g<=grade());return ks.length?avg(ks.map(k=>mastery(k.id))):0}
+function olyTarget(){
+ let best=null;
+ for(const o of OLY){
+  if(!S.oly[o.id]||o.off) continue;
+  const r=nextRoundAfter(o); if(!r||r.days>60) continue;
+  const w=Math.min(.6,.15+.45*(1-r.days/60));
+  if(!best||w>best.w) best={o,w,ev:r};
+ }
+ if(!best) return null;
+ const pool=(best.o.focus||[]).map(byId).filter(k=>k&&k.g<=grade()&&!S.prog.skip[k.id]).sort((a,b)=>mastery(a.id)-mastery(b.id));
+ return pool.length?{...best,k:pick(pool.slice(0,3))}:null;
+}
+function pickNext(){
+ if(S.diag?.queue.length) return {k:byId(S.diag.queue[0]),why:'diag'};
+ const q=S.prog.queue.find(x=>byId(x.skill));
+ if(q) return {k:byId(q.skill),why:'si',q};
+ const now=Date.now(), C=[], last=S.cur?.skill, plan=PLAN();
+ const f=frontier(); if(f) C.push({w:.5,k:f,why:'new'});
+ const due=plan.filter(k=>S.sk[k.id]?.n&&S.sk[k.id].due<=now).sort((a,b)=>(S.sk[a.id].due-S.sk[b.id].due)||(mastery(a.id)-mastery(b.id)));
+ if(due.length) C.push({w:.3,k:due[0],why:'review'});
+ const weak=plan.filter(k=>S.sk[k.id]?.n>=2&&mastery(k.id)<.45).sort((a,b)=>mastery(a.id)-mastery(b.id));
+ if(weak.length) C.push({w:.2,k:weak[0],why:'grind'});
+ const o=olyTarget(); if(o) C.push({w:o.w,k:o.k,why:'oly',oly:o.o,ev:o.ev});
+ let P=C.filter(c=>c.k.id!==last); if(!P.length) P=C;
+ if(!P.length){const studied=plan.filter(k=>S.sk[k.id]?.n).sort((a,b)=>S.sk[a.id].last-S.sk[b.id].last);return {k:studied[0]||plan[0]||SK[0],why:'review'}}
+ let x=Math.random()*P.reduce((a,c)=>a+c.w,0);
+ for(const c of P) if((x-=c.w)<=0) return c;
+ return P[0];
+}
+function shape(c){
+ const s=sk(c.k.id), m=mastery(c.k.id), heat=c.why==='diag'?0:sessionHeat();
+ let d=clamp(Math.round((s.r-108-700)/100),1,10), task=null, fmt;
+ const first=c.why==='new'&&!s.n;
+ if(c.why==='diag'){
+  const p2=c.k.e.filter(t=>t>=22&&t<=23), p1=c.k.e.filter(t=>t<=20);
+  task=pick(p2.length?p2:p1); d=task>20?5:4;
+  fmt=`ДИАГНОСТИКА уровня: типичная задача ЕГЭ №${task} (${EGE[task]}). Проверяет, владеет ли ученик темой без подготовки; без ловушек и экзотики.`;
+ }else if(c.why==='oly'){
+  d=Math.max(d+1,c.ev.st.k==='final'?8:6);
+  fmt=`олимпиадная задача в стиле олимпиады «${c.oly.name}» (${c.ev.st.t}). ${c.oly.style||''} Только программа ${grade()} класса. Ответ — число.`;
+ }else if(!c.k.e.length){
+  d=Math.max(d,5); fmt='олимпиадная задача на эту тему, ответ — число.';
+ }else{
+  const p1=c.k.e.filter(t=>t<=20), p2=c.k.e.filter(t=>t>20);
+  const part2=p2.length&&!first&&(m>=.7||!p1.length||(m>=.45&&Math.random()<.5)||heat>=2);
+  task=pick(part2?p2:p1);
+  if(task<=20) d=Math.min(d,4); else if(task<=23) d=clamp(d,4,6); else d=clamp(d,6,8);
+  fmt=`ЕГЭ, задание №${task}: ${EGE[task]}.`;
+ }
+ if(c.k.custom) fmt+=` Это своя тема программы: ${c.k.desc||c.k.n}.`;
+ if(c.why==='si'){ if(c.q.d) d=c.q.d; fmt+=` ЗАДАНИЕ ОТ СИ (обязательно выполни): ${c.q.note}`; }
+ if(first){ d=Math.max(1,d-1); fmt+=' Ученик только что прочитал вводный урок по этой теме: задача закрепляет урок, без подвохов.'; }
+ if(c.why==='grind') d-=1;
+ d=clamp(d+heat,1,10);
+ const ok=S.sess.ok||0, ideas=SQ.filter(unlocked).sort((a,b)=>(S.sk[a.id]?.n||0)-(S.sk[b.id]?.n||0));
+ let extra=null;
+ if(ok>=2&&!['grind','diag'].includes(c.why)&&!first&&ideas.length&&Math.random()<Math.min(.7,.12*ok)){
+  extra=pick(ideas.slice(0,3));
+  fmt+=` Сделай задачу интереснее обычной: в ней должна понадобиться идея за рамками школьной программы — «${extra.n}». Объясни эту идею в поле intro: мини-урок до 120 слов, понятный десятикласснику, с одним простым примером. Без громоздкой математики.`;
+ }
+ if(heat>=1) fmt+=heat>=2?' Ученик в ударе: задача на грани олимпиадной, с красивой неочевидной идеей.':' Ученик разогрелся: задача нестандартная, с необычной ситуацией, а не подстановка в формулу.';
+ return {d,task,fmt,extra,first};
+}
+
+/* ---------- Си: генерация задач и уроков ---------- */
+const TIERS={quick:'Быстрая',default:'Обычная',complex:'Сильная'};
+const MODELS={quick:'claude-haiku-5-5',default:'claude-sonnet-5-5',complex:'claude-opus-5-5'};
+const apiKey=()=>{try{return localStorage.getItem('si-api-key')||''}catch{return ''}};
+async function api(body){
+ let r;
+ try{r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':apiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)})}
+ catch{throw {code:'network'}}
+ if(!r.ok) throw {code:r.status===401||r.status===403?'bad_key':r.status===429||r.status===529?'rate_limited':'upstream_error'};
+ return r.json();
+}
+// тот же интерфейс, что у sample в claude.ai: sample(prompt|turns,{modelTier,tools,onText}) → {text}
+async function SAMPLE(input,o={}){
+ if(!apiKey()) throw {code:'not_granted'};
+ const messages=typeof input==='string'?[{role:'user',content:input}]:input.map(m=>({role:m.role,content:m.content}));
+ const tools=o.tools||[], defs=tools.map(t=>({name:t.name,description:t.description,input_schema:t.inputSchema||{type:'object',properties:{}}}));
+ let text='';
+ for(let i=0;i<10;i++){
+  const r=await api({model:MODELS[o.modelTier]||MODELS.default,max_tokens:8000,messages,...(defs.length?{tools:defs}:{})});
+  if(r.stop_reason==='refusal') throw {code:'refused'};
+  text+=r.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+  if(r.stop_reason!=='tool_use') break;
+  messages.push({role:'assistant',content:r.content});
+  const results=[];
+  for(const b of r.content.filter(b=>b.type==='tool_use')){
+   const t=tools.find(t=>t.name===b.name);
+   try{results.push({type:'tool_result',tool_use_id:b.id,content:String(await t.execute(b.input))})}
+   catch(e){results.push({type:'tool_result',tool_use_id:b.id,content:String(e?.message||e),is_error:true})}
+  }
+  messages.push({role:'user',content:results});
+ }
+ if(!text.trim()) throw {code:'empty_completion'};
+ o.onText?.({text});
+ return {text};
+}
+SAMPLE.json=async(prompt,o)=>{
+ const t=(await SAMPLE(prompt,o)).text, a=t.indexOf('{'), b=t.lastIndexOf('}');
+ try{return JSON.parse(t.slice(a,b+1))}catch{throw {code:'invalid_json'}}
+};
+function setKey(k){
+ try{k?localStorage.setItem('si-api-key',k):localStorage.removeItem('si-api-key')}catch{}
+ sample=k?SAMPLE:null; toolsOK=!!sample; render(); if(sample) prefetch();
+}
+const ERR={not_granted:'Чтобы я думала, вставь API-ключ Anthropic в «Настройках».',bad_key:'Ключ API не подошёл. Проверь его в «Настройках».',network:'Нет связи с api.anthropic.com. Проверь интернет и попробуй снова.',rate_limited:'Лимит запросов. Передохни пару минут и попробуй снова.',invalid_json:'Я написала задачу криво. Нажми ещё раз.',refused:'Это я составить не смогла. Попробуй ещё раз.',sampling_disabled:'Чтобы я думала, вставь API-ключ Anthropic в «Настройках».',empty_completion:'Я промолчала. Попробуй ещё раз.'};
+const errText=e=>ERR[e?.code]||'Связь со мной прервалась. Попробуй ещё раз.';
+function genPrompt(c,sh){
+ const known=S.tricks.slice(-40).map(t=>t.n).join('; ')||'пока нет';
+ const weak=PLAN().filter(k=>S.sk[k.id]?.n>=2&&mastery(k.id)<.5).sort((a,b)=>mastery(a.id)-mastery(b.id)).slice(0,3).map(k=>k.n).join('; ');
+ return `Ты — Си, репетитор по физике. Составь ОДНУ задачу для ученика ${grade()} класса из Москвы. Цели: ЕГЭ по физике (2028) и олимпиады. Ученик сильный и мотивированный.
+Тема: ${c.k.n}.
+Формат: ${sh.fmt}
+Сложность: ${sh.d}/10 (1 — простейшее задание ЕГЭ, 5 — вторая часть ЕГЭ, 7 — региональный этап ВсОШ, 10 — финал ВсОШ).
+Приёмы, которые ученик уже видел (не делай их главной идеей): ${known}.
+${weak?'Слабые места: '+weak+'.\n':''}${S.notes.length?'Что известно об ученике: '+S.notes.join('; ')+'.\n':''}Правила:
+- В задаче должна быть хотя бы одна НОВАЯ для ученика идея, приём или лайфхак — назови её в trick.
+- Условие самодостаточное, числа реалистичные, g = 10 м/с², если не сказано иное. Формулы — LaTeX внутри $...$.
+- Рисунок только если без него никак: простой SVG (с viewBox, stroke="#dfe3ff", fill="none", подписи fill="#dfe3ff", до 1500 символов) в поле svg; иначе null.
+- Сначала реши сам в поле solution, проверь ответ подстановкой и только потом заполни answer.
+Верни только JSON:
+{"title":"до 6 слов","hello":"одна фраза Си к этой задаче: дерзкая, но подбадривающая, до 110 символов, без спойлеров","intro":"мини-урок, если просили идею за рамками программы, иначе null","text":"условие","type":"num|set|seq|str|explain","solution":"краткое, но полное решение","answer":48,"unit":"единицы ответа или пустая строка","tol":0.02,"hint":"подсказка-направление без ответа","trick":{"name":"до 6 слов","idea":"суть приёма в 1–2 предложениях"},"svg":null}
+type: num — ответ числом в указанных единицах; set — цифры в любом порядке (выбор утверждений); seq — цифры строго по порядку; str — короткая строка; explain — развёрнутое объяснение (тогда answer — ключевые пункты эталона).
+Вариант №${Math.floor(Math.random()*1e6)}`;
+}
+async function generate(c){
+ const sh=shape(c);
+ const r=await sample.json(genPrompt(c,sh),{modelTier:S.set.tier,cache:false});
+ if(!r||typeof r.text!=='string'||r.answer==null) throw {code:'invalid_json'};
+ const type=['num','set','seq','str','explain'].includes(r.type)?r.type:(typeof r.answer==='number'?'num':'str');
+ if(c.why==='si'){c.q.n--; if(c.q.n<=0) S.prog.queue=S.prog.queue.filter(x=>x!==c.q)}
+ return newProblem({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),skill:c.k.id,why:c.why,oly:c.oly?.id||null,olyName:c.oly?.name||null,olyStage:c.ev?.st?.t||null,extra:sh.extra?.id||null,lesson:sh.first,task:sh.task,d:sh.d,heat:c.why==='diag'?0:sessionHeat(),
+  title:String(r.title||c.k.n),hello:String(r.hello||''),intro:r.intro?String(r.intro):'',text:r.text,type,solution:String(r.solution||''),
+  answer:type==='num'?Number(r.answer):String(r.answer),unit:String(r.unit||''),tol:clamp(Number(r.tol)||.02,.005,.1),hint:String(r.hint||''),
+  trick:r.trick&&r.trick.name?{name:String(r.trick.name),idea:String(r.trick.idea||'')}:null,
+  svg:typeof r.svg==='string'&&r.svg.length<4000&&r.svg.trim().startsWith('<svg')?r.svg:null});
+}
+let genBusy=null, epoch=0;
+const bump=()=>{epoch++;S.next=null};
+function prefetch(){
+ if(!sample||S.next||genBusy) return;
+ const c=pickNext(), ep=epoch;
+ genBusy=generate(c).then(p=>{if(ep!==epoch)return null;S.next=p;save(true);if(p.lesson)lesson(p.skill).catch(()=>{});return p}).finally(()=>{genBusy=null});
+ genBusy.catch(e=>console.warn('prefetch',e));
+}
+const lessonCache={}, lessonBusy={};
+function lessonPrompt(k){
+ const st=S.sk[k.id];
+ return `Ты — Си, репетитор по физике: дерзкая, но очень понятно объясняешь. Напиши вводный урок по теме «${k.n}»${k.desc?' ('+k.desc+')':''} для ученика ${grade()} класса (Москва, цели — ЕГЭ и олимпиады). ${st?.n?'Ученик уже решал задачи по теме, но плавает — объясни заново и глубже.':'Ученик видит тему впервые или почти впервые.'}
+${S.notes.length?'Что известно об ученике: '+S.notes.join('; ')+'.\n':''}Структура, каждый раздел с заголовком в **…**:
+**Суть** — интуиция, 2–4 предложения, без формул.
+**Главное** — ключевые законы и формулы, каждая буква поясняется.
+**Разберём пример** — одна задача уровня ЕГЭ с решением по шагам.
+**Где ошибаются** — 2–3 типичные ловушки.
+**Что дальше** — как тема пригодится в ЕГЭ и на олимпиадах.
+Не больше 380 слов. Формулы — LaTeX в $...$. Без вступлений и прощаний.`;
+}
+async function lesson(id){
+ if(lessonCache[id]) return lessonCache[id];
+ if(lessonBusy[id]) return lessonBusy[id];
+ return lessonBusy[id]=(async()=>{
+  try{
+   let t=null; try{t=await store.getLesson(id)}catch{}
+   if(!t){ if(!sample) throw {code:'sampling_disabled'}; t=(await sample(lessonPrompt(byId(id)),{modelTier:S.set.tier,cache:false})).text; store.putLesson(id,t).catch(()=>{}) }
+   return lessonCache[id]=t;
+  }finally{delete lessonBusy[id]}
+ })();
+}
+async function showLesson(id,open=true){
+ const k=byId(id), B=$('#lesson'); if(!k) return;
+ B.innerHTML=`<details class="box lesson" ${open?'open':''}><summary><h4>Урок · ${esc(k.n)}</h4><span class="small">свернуть</span></summary><div class="read" id="lessonText"><div class="loading"><div class="orbit"></div>Си готовит объяснение…</div></div></details>`;
+ if(!lessonCache[id]) mood('load');
+ try{const t=await lesson(id); if(S.cur?.skill!==id&&B.dataset.for!==id) return; const T=$('#lessonText'); if(T){T.innerHTML=fmt(t);typeset(T)} mood('watch')}
+ catch(e){const T=$('#lessonText'); if(T) T.innerHTML=`<p>${esc(errText(e))}</p>`; mood('sigh')}
+}
+
+/* ---------- проверка ответа ---------- */
+function parseNum(s){
+ let t=String(s).trim().replace(/\s+/g,'').replace(/,/g,'.').replace(/[−–]/g,'-');
+ t=t.replace(/[×x·*]10\^?\(?([+-]?\d+)\)?/i,'e$1').replace(/^10\^\(?([+-]?\d+)\)?/,'1e$1');
+ const m=t.match(/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?/i);
+ return m?Number(m[0]):NaN;
+}
+const digits=s=>String(s).replace(/\D/g,'');
+const normStr=s=>String(s).toLowerCase().replace(/\s+/g,'').replace(/,/g,'.').replace(/\+-|\+\/-/g,'±');
+function judge(p,input){
+ if(p.type==='num'){const v=parseNum(input);if(isNaN(v))return {ok:false,why:'nan'};const a=p.answer;
+  if(Math.abs(v-a)<=Math.max(Math.abs(a)*p.tol,1e-12)) return {ok:true};
+  if(a!==0&&v!==0){const r=v/a;if(r<0)return {ok:false,why:'sign'};const l=Math.log10(Math.abs(r));
+   if(Math.abs(l)>=.95&&Math.abs(l-Math.round(l))<.03)return {ok:false,why:'order'};
+   if(Math.abs(r-2)<.03||Math.abs(r-.5)<.015)return {ok:false,why:'two'};
+   if(Math.abs(r-1)<.12)return {ok:false,why:'close'}}
+  return {ok:false};}
+ if(p.type==='set') return {ok:[...digits(input)].sort().join('')===[...digits(p.answer)].sort().join('')&&digits(input).length>0};
+ if(p.type==='seq') return {ok:digits(input)===digits(p.answer)&&digits(input).length>0};
+ return {ok:normStr(input)===normStr(p.answer)};
+}
+
+/* ---------- реплики: дразнит, но толкает вперёд ---------- */
+const SAY={
+ first:['Верно с первого раза. Не то чтобы я сомневалась… ладно, сомневалась. Дальше будет сложнее.','Правильно. Вот это уже похоже на будущего олимпиадника.','Чисто. Запомни это ощущение — на олимпиаде оно тебе понадобится.','Да. Быстро и без паники. Ещё одну?'],
+ later:['Решил. Не с первого раза — но дожал, а это главное умение.','Засчитано. Теперь посмотри в решение, где споткнулся, — второй раз это не повторится.','Дошёл. Ошибки на тренировке — это дешёвые ошибки. На экзамене они дорогие.'],
+ nan:'Мне нужно число. Посчитай до конца — я подожду.',
+ sign:'Знак не тот — значит, остальное у тебя, скорее всего, верно. Проверь направление осей.',
+ order:'Порядок не тот: физика верная, единицы — нет. Переведи всё в СИ и добей.',
+ close:'Почти! Где-то рано округлил или взял не то g. Пересчитай аккуратно — ты в одном шаге.',
+ two:'Ровно в два раза мимо. Где-то потерялась двойка — найди её, это быстро.',
+ wrong:['Мимо. Не смотри на меня — смотри в условие: что дано, что найти?','Нет. Сначала рисунок и силы, потом формулы. Ты справишься.','Не то. Запиши уравнения ещё раз, по шагам, — ошибка всплывёт сама.','Нет. Но олимпиадники ошибаются чаще всех — они просто не останавливаются.'],
+ hint:['Держи подсказку. Дальше — сам, я в тебя верю. Немного.','Ладно, подскажу. Но следующую — без меня.'],
+ gave:'Сдался — честно. Разбери решение до конца: эта идея вернётся, и тогда она будет твоей.',
+ heat:['Ты в ударе. Поднимаю ставки — следующая будет злее и интереснее.','Серия! Раз так, выходим за рамки школьной программы.','Неплохо. Посмотрим, как ты справишься с этим.']
+};
+
+/* ---------- честный вердикт ---------- */
+function secs(days){let s=0;for(let i=0;i<days;i++){const d=new Date(Date.now()-i*DAY);s+=S.days[dkey(d)]||0}return s}
+function needMinWeek(){
+ const weeks=Math.max(4,(EGE_DATE-Date.now())/(7*DAY)-10);
+ let min=0; for(const k of PLAN()) if(k.s!=='oly'){const m=mastery(k.id);if(m<.75)min+=(.75-m)/.75*18*15}
+ const up=OLY.filter(o=>S.oly[o.id]&&!o.off&&(nextRoundAfter(o)?.days??999)<=45).length;
+ return Math.round(min/weeks+Math.min(180,up*90));
+}
+function verdict(){
+ const n=S.hist.length, m7=secs(7)/60, m28=secs(28)/60, need=needMinWeek();
+ const h14=S.hist.filter(h=>Date.now()-h.t<14*DAY), acc=h14.length?avg(h14.map(h=>h.s)):null, pct=acc==null?'':Math.round(acc*100)+'%';
+ const lastT=n?S.hist[n-1].t:0, gap=Math.floor((Date.now()-lastT)/DAY);
+ const overdue=PLAN().filter(k=>S.sk[k.id]?.n&&S.sk[k.id].due<Date.now()-3*DAY).length;
+ const soon=OLY.filter(o=>S.oly[o.id]&&!o.off).map(o=>({o,r:nextRoundAfter(o)})).filter(x=>x.r&&x.r.days<=14).sort((a,b)=>a.r.days-b.r.days)[0];
+ const falling=m28>=60&&m7<.6*(m28/4)?' Темп падает: месяц назад ты занимался больше.':'';
+ if(!n) return {tier:'new',mood:'happy',text:'Я Си. Готовлю к ЕГЭ и олимпиадам и честно говорю, как у тебя дела. Хвалить просто так не буду — но и бросить тебе не дам.'};
+ if(gap>=7) return {tier:'bad',mood:'sigh',text:`Тебя не было ${gap} ${plural(gap,'день','дня','дней')}. Ничего, бывает. Полчаса сегодня — и мы снова в игре.`};
+ if(soon&&olyReadiness(soon.o)<.5) return {tier:'warn',mood:'think',text:`До «${soon.o.name}» ${soon.r.days} ${plural(soon.r.days,'день','дня','дней')}, а готовность по её темам ~${Math.round(olyReadiness(soon.o)*100)}%. Мало, но успеть можно — переключаю часть задач на неё.`};
+ if(m7<.4*need) return {tier:'bad',mood:'sigh',text:`${fmtMin(m7)} за неделю при нужных ~${fmtMin(need)}. Это пока визит вежливости. Добавь пару сессий — и график снова твой.${falling}`};
+ if(h14.length>=8&&acc<.45) return {tier:'warn',mood:'think',text:`Решаешь много, но точность ${pct}. Сбавляю сложность. Читай решения до конца и спрашивай меня — я для этого здесь.`};
+ if(overdue>5) return {tier:'warn',mood:'think',text:`${overdue} ${plural(overdue,'тема ждёт','темы ждут','тем ждут')} повторения. Сначала закрепим их — иначе забудешь быстрее, чем выучишь.`};
+ if(m7<.8*need) return {tier:'warn',mood:'think',text:`${fmtMin(m7)} из ~${fmtMin(need)} за неделю. Не провал, но до плана не дотягиваешь. Одна лишняя сессия — и догонишь.${falling}`};
+ if(h14.length>=8&&acc>.85) return {tier:'good',mood:'cool',text:`Точность ${pct} — тебе слишком легко. Поднимаю сложность, не обижайся.`};
+ return {tier:'good',mood:'happy',text:`${fmtMin(m7)} за неделю${pct?', точность '+pct:''}. Так и держи — а я буду держать планку.`};
+}
+function egeEstimate(){
+ const W=t=>t<=20?1.4:{21:3,22:2,23:2,24:3,25:3,26:4}[t], D=t=>700+100*(t<=20?3:t<=23?5:7);
+ let pts=0;
+ for(let t=1;t<=26;t++){const ks=SK.filter(k=>k.e.includes(t));pts+=W(t)*elo(avg(ks.map(k=>S.sk[k.id]?.n?S.sk[k.id].r:750)),D(t))}
+ return Math.round(pts);
+}
+
+/* ---------- аватар ---------- */
+const MOODS={watch:'Си внимательно смотрит',happy:'Си улыбается',thumb:'Си показывает большой палец',think:'Си думает',load:'Си что-то вычисляет',sigh:'Си вздыхает',cool:'Си надевает очки'};
+const LEGACY={smug:'watch',meh:'sigh',wow:'thumb'};
+Object.keys(MOODS).forEach(m=>{const i=new Image();i.src='si/'+m+'.webp'});
+let curMood='watch', moodT=0;
+function mood(m){
+ m=LEGACY[m]||m; if(!MOODS[m]||m===curMood) return; curMood=m;
+ const img=$('#siImg'); img.classList.add('off'); clearTimeout(moodT);
+ moodT=setTimeout(()=>{img.src='si/'+m+'.webp';img.alt=MOODS[m];img.classList.remove('off')},180);
+}
+function say(text,m){$('#say').innerHTML=fmt(text);typeset($('#say'));if(m)mood(m)}
+
+/* ---------- экран задачи ---------- */
+const WHY={start:'разминка',new:'новая тема',review:'повторение',grind:'добиваем слабое',oly:'олимпиада',diag:'диагностика',si:'задача от Си'};
+function render(){
+ const p=S.cur; if(!p) return;
+ const k=byId(p.skill);
+ const chips=[`<span class="chip why">${esc(p.why==='oly'?(p.olyName||'олимпиада')+(p.olyStage?' · '+p.olyStage:''):p.why==='diag'?`диагностика · ${S.diag?(S.diag.total-S.diag.queue.length+(p.status==='open'?1:0))+' из '+S.diag.total:''}`:WHY[p.why]||'')}</span>`];
+ if(p.task) chips.push(`<span class="chip">ЕГЭ №${p.task}</span>`);
+ if(k) chips.push(`<span class="chip">${esc(k.custom?k.n:SECTIONS[k.s])}</span>`);
+ if(p.extra) chips.push(`<span class="chip side">за рамками программы</span>`);
+ chips.push(`<span class="chip">сложность ${p.d}/10</span>`);
+ if(p.heat) chips.push(`<span class="chip heat">серия · +${p.heat}</span>`);
+ $('#meta').innerHTML=chips.join('');
+ const L=$('#lesson'); if(L.dataset.pid!==p.id){L.innerHTML='';L.dataset.for='';L.dataset.pid=p.id;if(p.lesson&&p.status==='open'){L.dataset.for=p.skill;showLesson(p.skill,true)}}
+ let h=`<h1 class="ptitle">${esc(p.title)}</h1>`;
+ if(p.intro) h+=`<div class="intro"><span class="lab">Новая идея: ${esc(byId(p.extra)?.n||'')}</span>${fmt(p.intro)}</div>`;
+ h+=`<div class="ptext">${fmt(p.text)}</div>`;
+ if(p.svg) h+=`<div class="fig"><img alt="Рисунок к задаче" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(p.svg)}"></div>`;
+ if(p.task>=22) h+=`<p class="note">Во второй части ЕГЭ нужно полное решение — оформи его на бумаге. Здесь я проверяю итоговое число.</p>`;
+ if(p.type==='set') h+=`<p class="note">Ответ — номера верных утверждений, порядок не важен.</p>`;
+ if(p.type==='seq') h+=`<p class="note">Ответ — цифры по порядку, без пробелов.</p>`;
+ $('#problem').innerHTML=h; typeset($('#problem'));
+ const ta=$('#answer'); ta.value=p.status==='open'?(p.draft||''):(p.tries.at(-1)||'');
+ ta.rows=p.type==='explain'?6:1; ta.placeholder=p.type==='explain'?'Объяснение: какие явления и законы работают и почему':'Ответ';
+ ta.disabled=p.status!=='open';
+ $('#unit').hidden=!p.unit||p.type!=='num'; $('#unit').textContent=p.unit;
+ const open=p.status==='open';
+ $('#checkBtn').hidden=!open; $('#hintBtn').hidden=!open||!p.hint; $('#hintBtn').disabled=!!p.hintUsed;
+ $('#giveBtn').hidden=!open; $('#nextBtn').hidden=open;
+ $('#disputeBtn').hidden=!(open&&sample&&p.tries.length&&p.type!=='explain');
+ $('[data-q="start"]').hidden=!open; $('[data-q="steps"]').hidden=open;
+ document.querySelectorAll('#quick button').forEach(b=>b.disabled=!sample);
+ renderChoices(); renderReveal(); renderChat();
+}
+function renderChoices(){
+ const C=$('#choices');
+ C.innerHTML=(!S.hist.length&&!S.diag&&!S.start)?`<button class="btn primary" data-choice="diag">Проверь мой уровень</button><button class="btn" data-choice="zero">Учи меня с самого начала</button>`:'';
+}
+function renderReveal(){
+ const p=S.cur, R=$('#reveal'); let h='';
+ if(p.status==='open'&&p.hintUsed) h+=`<div class="box"><h4>Подсказка</h4><div class="read">${fmt(p.hint)}</div></div>`;
+ if(p.status!=='open'){
+  if(p.grade) h+=`<div class="box"><h4>Оценка: ${p.grade.score} из 3</h4><div class="read">${fmt(p.grade.comment)}</div></div>`;
+  const ans=p.type==='explain'?'':`<p class="${p.status==='gave'?'verdict-bad':'verdict-ok'}">Ответ: <b>${esc(p.answer)}</b> ${esc(p.type==='num'?p.unit:'')}</p>`;
+  h+=`<div class="box"><h4>Решение</h4>${ans}<div class="read">${fmt(p.solution)}</div></div>`;
+  if(p.trick) h+=`<div class="box trick"><h4>Новый приём в копилку</h4><b>${esc(p.trick.name)}</b><div class="read">${fmt(p.trick.idea)}</div></div>`;
+ }
+ R.innerHTML=h; typeset(R);
+}
+function renderChat(){
+ const L=$('#chatlog'); const p=S.cur;
+ L.innerHTML=(p?.chat||[]).map(m=>`<div class="msg ${m.role==='user'?'me':m.role==='tool'?'tool':''}">${fmt(m.content)}</div>`).join('');
+ typeset(L); L.scrollTop=L.scrollHeight;
+ $('#chatIn').disabled=!sample; $('#chatIn').placeholder=sample?'Спроси что угодно: про задачу, теорию или свой план':'Чат заработает, когда добавишь API-ключ в «Настройках»';
+}
+function greet(){
+ const p=S.cur;
+ if(!greeted&&ready){greeted=true;const v=verdict();say(v.text+(p.hello&&p.status==='open'?'\n\n'+p.hello:'')+(sample?'':'\n\nЧтобы я придумывала новые задачи, вставь API-ключ Anthropic в «Настройках».'),v.mood);return}
+ say(p.hello||'Решай. Я смотрю.',p.status==='open'?'watch':undefined);
+}
+function loadingView(text){
+ $('#meta').innerHTML='';$('#reveal').innerHTML='';$('#lesson').innerHTML='';$('#lesson').dataset.for='';$('#lesson').dataset.pid='';
+ $('#problem').innerHTML=`<div class="loading"><div class="orbit"></div>${esc(text)}</div>`;
+ ['#checkBtn','#hintBtn','#giveBtn','#nextBtn','#disputeBtn'].forEach(s=>$(s).hidden=true);
+ $('#answer').disabled=true; mood('load');
+}
+
+/* ---------- действия ---------- */
+function learn(p,s){
+ const st=sk(p.skill), D=700+100*p.d, E=elo(st.r,D), K=st.n<3?120:st.n<8?70:40;
+ st.r=Math.round(st.r+K*(s-E)); st.n++; if(s>=.6)st.ok++; st.last=Date.now();
+ st.iv=s>=.6?Math.min(60,Math.max(1,(st.iv||1)*(s>=.9?2.5:1.8))):1; st.due=Date.now()+st.iv*DAY;
+ if(p.extra){const x=sk(p.extra);x.n++;x.r=Math.round(x.r+60*(s-elo(x.r,D)));x.last=Date.now()}
+ S.hist.push({t:Date.now(),k:p.skill,d:p.d,s:Math.round(s*100)/100,w:p.why}); if(S.hist.length>400) S.hist.splice(0,S.hist.length-400);
+ if(p.trick&&!S.tricks.some(t=>t.n===p.trick.name)){S.tricks.push({n:p.trick.name,i:p.trick.idea,k:p.skill,t:Date.now()});if(S.tricks.length>300)S.tricks.shift()}
+ touchSession(); if(s>=.6&&p.why!=='diag') S.sess.ok=(S.sess.ok||0)+1; S.sess.n=(S.sess.n||0)+1;
+}
+function setKnown(id,r){const st=sk(id);st.r=Math.max(st.r,r);st.n=Math.max(st.n,4);st.iv=Math.max(st.iv||0,7);st.due=Math.max(st.due,Date.now()+7*DAY)}
+function diagStep(p,s){
+ const D=S.diag; if(!D) return null;
+ D.queue=D.queue.filter(x=>x!==p.skill); D.res[p.skill]=s;
+ if(s>=.6){ancestors(p.skill).forEach(a=>setKnown(a,1250)); setKnown(p.skill,s>=.9?1250:1150)}
+ else{const st=sk(p.skill);st.r=Math.min(st.r,950);st.due=Date.now();
+  D.queue=D.queue.filter(x=>{if(ancestors(x).includes(p.skill)){sk(x).r=Math.min(sk(x).r,950);D.res[x]=0;return false}return true})}
+ if(D.queue.length) return null;
+ const ok=Object.entries(D.res).filter(([,v])=>v>=.6).map(([k])=>byId(k).n), bad=Object.entries(D.res).filter(([,v])=>v<.6).map(([k])=>byId(k).n);
+ S.diag=null; bump();
+ const f=frontier();
+ return `Диагностика закончена. ${ok.length?'Уверенно: '+ok.slice(0,4).join('; ')+(ok.length>4?' и ещё '+(ok.length-4):'')+'.':'Пока ничего уверенно — значит, строим с нуля, и это нормально.'} ${bad.length?'Надо подтянуть: '+bad.slice(0,3).join('; ')+'.':''} ${f?'Начинаем с темы «'+f.n+'» — с урока.':''}`;
+}
+function touchSession(){if(Date.now()-(S.sess.t||0)>45*60e3)S.sess={t:Date.now(),n:0,ok:0};S.sess.t=Date.now()}
+function finish(p,status,s){
+ const heatBefore=sessionHeat();
+ p.status=status; p.done=Date.now(); p.score=s; learn(p,s); S.solvedN=(S.solvedN||0)+1;
+ const diagMsg=p.why==='diag'?diagStep(p,s):null;
+ store.addSolved(p).catch(e=>console.warn('solved',e));
+ render(); save(true); prefetch();
+ return {up:sessionHeat()>heatBefore,diagMsg};
+}
+$('#answer').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&S.cur?.type!=='explain'){e.preventDefault();$('#answerForm').requestSubmit()}});
+$('#answer').addEventListener('input',e=>{if(S.cur){S.cur.draft=e.target.value}});
+$('#answerForm').addEventListener('submit',async e=>{
+ e.preventDefault(); const p=S.cur; const v=$('#answer').value.trim(); if(!v||p.status!=='open') return;
+ if(p.type==='explain') return gradeExplain(p,v);
+ const j=judge(p,v); p.tries.push(v);
+ if(j.ok){
+  const wrong=p.tries.length-1, s=wrong===0&&!p.hintUsed?1:Math.max(.3,1-.25*wrong-(p.hintUsed?.25:0));
+  const r=finish(p,wrong===0&&!p.hintUsed?'first':'help',s);
+  if(r.diagMsg) say(r.diagMsg,'happy');
+  else if(r.up) say(pick(SAY.heat),'cool');
+  else say(pick(s===1?SAY.first:SAY.later),s===1?'thumb':'happy');
+ }else if(p.why==='diag'&&p.tries.length>=2){
+  const r=finish(p,'gave',0); say(r.diagMsg||'Не страшно — это диагностика, она для того и нужна. Запомнила, вернёмся к этой теме с уроком.','think');
+ }else{
+  say(j.why?SAY[j.why]:pick(SAY.wrong),j.why==='close'?'think':'sigh');
+  render(); save();
+ }
+});
+$('#hintBtn').addEventListener('click',()=>{const p=S.cur;if(!p.hint||p.hintUsed)return;p.hintUsed=true;say(pick(SAY.hint),'think');render();save(true)});
+$('#giveBtn').addEventListener('click',()=>{const p=S.cur;const r=finish(p,'gave',0);say(r.diagMsg||(p.why==='diag'?'Не страшно — это диагностика. Запомнила, вернёмся к теме с уроком.':SAY.gave),'sigh')});
+$('#disputeBtn').addEventListener('click',()=>ask(`Я ответил «${S.cur.tries.at(-1)}». Уверен, что это верно — проверь честно.`));
+$('#nextBtn').addEventListener('click',nextProblem);
+async function nextProblem(){
+ if(S.next){S.cur=S.next;S.next=null;save(true);render();say(S.cur.hello||'Следующая.','watch');prefetch();return}
+ if(!sample){say('Новые задачи я придумываю, когда в «Настройках» есть API-ключ.','sigh');return}
+ loadingView('Си придумывает задачу…');
+ try{ for(let i=0;i<2&&!S.next;i++){ if(!genBusy) prefetch(); await genBusy; } if(!S.next) throw {code:'upstream_error'}; S.cur=S.next; S.next=null; save(true); render(); say(S.cur.hello||'Готово. Решай.','watch'); prefetch(); }
+ catch(e){ $('#problem').innerHTML=`<p class="ptext">${esc(errText(e))}</p><button class="btn primary" id="retry">Попробовать снова</button>`; $('#retry').onclick=nextProblem; say(errText(e),'sigh'); }
+}
+async function gradeExplain(p,v){
+ if(!sample){say('Объяснения я проверяю, когда в «Настройках» есть API-ключ.','sigh');return}
+ p.tries.push(v); $('#checkBtn').disabled=true; mood('think'); say('Читаю…');
+ try{
+  const g=await sample.json(`Ты — Си, строгий эксперт ЕГЭ по физике. Оцени объяснение ученика к качественной задаче (задание 21; 0–3 балла по критериям ФИПИ: верный ответ и полное объяснение с указанием явлений и законов).
+Задача: ${p.text}
+Эталон (ключевые пункты): ${p.answer}
+Ответ ученика: ${v}
+Верни только JSON: {"score":0,"comment":"до 50 слов в характере Си: что упущено или что хорошо, и как дописать"}`,{modelTier:S.set.tier,cache:false});
+  const score=clamp(Math.round(Number(g.score)||0),0,3); p.grade={score,comment:String(g.comment||'')};
+  if(score>=2){finish(p,score===3&&!p.hintUsed&&p.tries.length===1?'first':'help',score/3);say(p.grade.comment,score===3?'thumb':'happy')}
+  else{say(p.grade.comment+'\n\nДопиши и отправь ещё раз — у тебя получится.','think');render();save()}
+ }catch(e){p.tries.pop();say(errText(e),'sigh')}
+ $('#checkBtn').disabled=false;
+}
+$('#choices').addEventListener('click',e=>{
+ const b=e.target.closest('[data-choice]'); if(!b) return;
+ if(b.dataset.choice==='diag'){startDiag()}
+ else{S.start='zero';bump();save(true);renderChoices();say('С нуля — так с нуля. Сначала урок, потом задача на него. Разминку можешь решить, а можешь сразу жать «Следующая задача».','happy');$('#nextBtn').hidden=false}
+});
+function startDiag(){
+ S.diag={queue:[...DIAG],total:DIAG.length,res:{}}; S.start='diag'; bump(); save(true);
+ say(`Проверю твой уровень: до ${DIAG.length} задач уровня ЕГЭ по темам 10 класса. Без подсказок, честно. Если тема не идёт — пропущу всё, что на ней строится.`,'cool');
+ if(!$('#drawer').hidden){$('#drawer').hidden=true;view=null}
+ nextProblem();
+}
+
+/* ---------- Си управляет программой ---------- */
+function programSummary(){
+ return 'id | тема | раздел | освоено | задач | статус\n'+PLAN(true).map(k=>{const s=S.sk[k.id];return `${k.id} | ${k.n} | ${SECTIONS[k.s]||'своя'} | ${Math.round(mastery(k.id)*100)}% | ${s?.n||0} | ${S.prog.skip[k.id]?'пропущена':introduced(k)?'знает':s?.n?'учит':unlocked(k)?'доступна':'закрыта'}${k.custom?', своя тема':''}`}).join('\n')
+  +'\nСейчас изучаем: '+(frontier()?.id||'—')+'\nОчередь задач от Си: '+(S.prog.queue.map(q=>`${q.skill}×${q.n}: ${q.note}`).join('; ')||'пусто');
+}
+const progChanged=msg=>{bump();save(true);if(view==='plan')drawView();return msg};
+const topicArg=id=>{const k=byId(String(id||''));if(!k||k.side)throw new Error('Нет темы с id '+id+'. Посмотри get_program.');return k};
+const TOOLS=[
+ {name:'get_program',description:'Возвращает программу ученика по порядку: id, тема, раздел, освоение, сколько задач решено, статус. Вызывай перед изменением программы.',execute:()=>programSummary()},
+ {name:'set_level',description:'Задать уровень ученика по теме, когда выяснилось, что он её знает или не знает. known — считать освоенной; learning — в процессе; unknown — учить с нуля (с уроком).',inputSchema:{type:'object',properties:{topic_id:{type:'string'},level:{type:'string',enum:['known','learning','unknown']}},required:['topic_id','level']},
+  execute:({topic_id,level})=>{const k=topicArg(topic_id),st=sk(k.id);
+   if(level==='known') setKnown(k.id,1250); else if(level==='learning'){st.r=1050;st.n=Math.max(st.n,1);st.due=Date.now()} else {st.r=850;st.n=0;st.due=0}
+   return progChanged(`«${k.n}»: ${level==='known'?'освоена':level==='learning'?'в процессе':'с нуля'}`)}},
+ {name:'move_topic',description:'Переставить тему: поставить сразу после темы after_id или в начало программы (after_id = "start"). Так меняется порядок изучения.',inputSchema:{type:'object',properties:{topic_id:{type:'string'},after_id:{type:'string'}},required:['topic_id','after_id']},
+  execute:({topic_id,after_id})=>{const k=topicArg(topic_id);const ord=PLAN(true).map(x=>x.id).filter(x=>x!==k.id);
+   const i=after_id==='start'?0:ord.indexOf(topicArg(after_id).id)+1; ord.splice(i,0,k.id); S.prog.order=ord;
+   return progChanged(`«${k.n}» перемещена`)}},
+ {name:'skip_topic',description:'Исключить тему из программы (skip = true) или вернуть её (skip = false).',inputSchema:{type:'object',properties:{topic_id:{type:'string'},skip:{type:'boolean'}},required:['topic_id','skip']},
+  execute:({topic_id,skip})=>{const k=topicArg(topic_id);if(skip)S.prog.skip[k.id]=true;else delete S.prog.skip[k.id];return progChanged(`«${k.n}» ${skip?'убрана из программы':'возвращена'}`)}},
+ {name:'add_topic',description:'Добавить в программу свою тему (например, нужную для олимпиады или за рамками школы). section — один из ключей: mech, mkt, el, mag, opt, qua, meth, oly. Возвращает id новой темы.',inputSchema:{type:'object',properties:{name:{type:'string'},section:{type:'string'},after_id:{type:'string'},description:{type:'string'},ege_tasks:{type:'array',items:{type:'integer'}}},required:['name','section','after_id','description']},
+  execute:({name,section,after_id,description,ege_tasks})=>{if(S.prog.custom.length>=30)throw new Error('Слишком много своих тем');
+   const k={id:'c'+Date.now().toString(36),s:SECTIONS[section]?section:'oly',g:grade(),n:String(name).slice(0,80),desc:String(description||'').slice(0,300),e:(Array.isArray(ege_tasks)?ege_tasks:[]).map(Number).filter(t=>t>=1&&t<=26),p:[],custom:true};
+   S.prog.custom.push(k); const ord=PLAN(true).map(x=>x.id).filter(x=>x!==k.id); const i=after_id==='start'?0:Math.max(0,ord.indexOf(String(after_id))+1)||ord.length; ord.splice(i,0,k.id); S.prog.order=ord;
+   progChanged(''); return `Добавлена тема ${k.id}: «${k.n}»`}},
+ {name:'queue_tasks',description:'Поставить в очередь ближайшие задачи по твоему замыслу: тема, количество (1–5), сложность 1–10 (необязательно) и инструкция составителю — какую идею проверить, какой формат, что объяснить. Эти задачи пойдут следующими.',inputSchema:{type:'object',properties:{topic_id:{type:'string'},count:{type:'integer'},difficulty:{type:'integer'},instruction:{type:'string'}},required:['topic_id','count','instruction']},
+  execute:({topic_id,count,difficulty,instruction})=>{const k=topicArg(topic_id);S.prog.queue.push({skill:k.id,n:clamp(Number(count)||1,1,5),d:difficulty?clamp(Number(difficulty),1,10):null,note:String(instruction).slice(0,400)});
+   if(S.prog.queue.length>8)S.prog.queue.shift(); return progChanged(`В очереди ${clamp(Number(count)||1,1,5)} ${plural(Number(count)||1,'задача','задачи','задач')} по теме «${k.n}»`)}},
+ {name:'start_diagnostic',description:'Запустить диагностику уровня заново (серия задач по темам 10 класса). Используй, если ученик просит проверить уровень.',execute:()=>{setTimeout(startDiag,50);return 'Диагностика запущена'}},
+];
+function liveTools(log){
+ return TOOLS.map(t=>({...t,execute:async(input)=>{const r=await t.execute(input||{});if(t.name!=='get_program'&&log)log(String(r));return r}}));
+}
+
+/* ---------- чат ---------- */
+function chatRules(p){
+ return `Ты — Си: девушка-учёный, репетитор по физике. Характер: дразнишь, но поддерживаешь; очень рациональна и точна; объясняешь так, что становится понятно. Отвечай по-русски, коротко (до 150 слов, теорию — сколько нужно), формулы в $...$.
+По текущей задаче: не выдавай ответ и полное решение, пока ученик явно не попросит или не сдался — веди наводящими вопросами и показывай полезные приёмы.
+Теорию объясняй по-настоящему: суть, формула, мини-пример. Если ученик говорит, что чего-то не знает, — объясни и поправь программу.
+${toolsOK?`У тебя есть инструменты управления программой: уровень тем, порядок, пропуск, свои темы, очередь задач по твоему замыслу, диагностика. Пользуйся ими, когда ученик просит изменить план, когда видно, что он не знает базу, или когда нужна серия задач на конкретную идею. После изменения скажи одной фразой, что сделала. id текущей темы: ${p.skill}.`:''}
+Если узнала что-то устойчивое о том, как ученику удобнее учиться (например, любит энергетический подход или путается в проекциях), добавь в самом конце отдельной строкой: ЗАМЕТКА: <до 12 слов>.
+Если ученик утверждает, что его ответ верен, проверь честно; если он прав (эталон ошибочен или ответ эквивалентен), начни ответ с [[ВЕРНО]].
+Задача: ${p.text}
+Эталонный ответ: ${p.answer} ${p.unit||''}
+Решение (не цитируй без запроса): ${p.solution}
+Попытки ученика: ${p.tries.join(' | ')||'нет'}
+Статус: ${p.status==='open'?'не решена':p.status==='gave'?'ученик сдался':'решена'}`;
+}
+const cleanReply=t=>t.replace(/^\s*ЗАМЕТКА:.*$/m,'').replace('[[ВЕРНО]]','').trim();
+let chatBusy=false;
+async function ask(msg){
+ if(!sample||chatBusy) return;
+ const p=S.cur; p.chat.push({role:'user',content:msg}); if(p.chat.length>20)p.chat.splice(0,p.chat.length-20);
+ renderChat(); chatBusy=true;
+ const L=$('#chatlog'); const live=document.createElement('div'); live.className='msg'; live.textContent='Думаю…'; L.append(live); L.scrollTop=L.scrollHeight;
+ mood('think');
+ const notes=[];
+ try{
+  const turns=[{role:'user',content:chatRules(p)},...p.chat.filter(m=>m.role!=='tool').slice(-10)];
+  const opts={modelTier:S.set.tier,cache:false,onText:({text})=>{live.innerHTML=fmt(cleanReply(text));L.scrollTop=L.scrollHeight}};
+  if(toolsOK) opts.tools=liveTools(m=>{notes.push(m);const t=document.createElement('div');t.className='msg tool';t.textContent='✦ '+m;L.insertBefore(t,live)});
+  const r=await sample(turns,opts);
+  const note=r.text.match(/^\s*ЗАМЕТКА:\s*(.+)$/m);
+  if(note){const t=note[1].trim().slice(0,120);if(!S.notes.includes(t)){S.notes.push(t);if(S.notes.length>8)S.notes.shift()}}
+  const okd=r.text.includes('[[ВЕРНО]]');
+  notes.forEach(n=>p.chat.push({role:'tool',content:'✦ '+n}));
+  p.chat.push({role:'assistant',content:cleanReply(r.text)});
+  if(okd&&p.status==='open'){finish(p,'help',.7);mood('thumb')} else {mood(notes.length?'cool':'watch');renderChat()}
+ }catch(e){
+  p.chat.pop(); renderChat(); say(errText(e),'sigh');
+ }
+ chatBusy=false; save(true);
+}
+$('#chatForm').addEventListener('submit',e=>{e.preventDefault();const v=$('#chatIn').value.trim();if(!v)return;$('#chatIn').value='';ask(v)});
+$('#quick').addEventListener('click',e=>{
+ const b=e.target.closest('[data-q]'); if(!b||!S.cur) return;
+ const q=b.dataset.q;
+ if(q==='lesson'){$('#lesson').dataset.for=S.cur.skill;showLesson(S.cur.skill,true)}
+ if(q==='start') ask('Не понимаю, с чего начать эту задачу. Дай первый шаг, но не решай за меня.');
+ if(q==='steps') ask('Разбери решение по шагам и объясни, почему каждый шаг именно такой.');
+ if(q==='dunno') ask(`Я плохо знаю тему «${byId(S.cur.skill)?.n||''}». Объясни с нуля и поправь мою программу, если нужно.`);
+});
+
+/* ---------- время ---------- */
+let lastAct=Date.now();
+['pointerdown','keydown','scroll','pointermove'].forEach(t=>addEventListener(t,()=>{lastAct=Date.now()},{passive:true}));
+setInterval(()=>{
+ if(!ready||document.visibilityState!=='visible'||Date.now()-lastAct>180000) return;
+ const k=today(); S.days[k]=(S.days[k]||0)+15; S.total+=15; if(S.cur&&S.cur.status==='open')S.cur.spent+=15;
+ touchSession(); renderHours(); save();
+},15000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flush()});
+function renderHours(){$('#hours').textContent=(S.total/3600).toFixed(1).replace('.',',')+' ч'}
+
+/* ---------- панели ---------- */
+let view=null, tab=null, planReply='';
+const VIEWS={plan:{t:'План',tabs:{prog:'Программа',oly:'Олимпиады'}},progress:{t:'Прогресс'},solved:{t:'Решённые',tabs:{list:'Задачи',tricks:'Приёмы'}},settings:{t:'Настройки'}};
+function openView(v,t){
+ view=v; const V=VIEWS[v]; tab=t||(V.tabs?Object.keys(V.tabs)[0]:null);
+ $('#dTitle').textContent=V.t;
+ $('#dTabs').innerHTML=V.tabs?Object.entries(V.tabs).map(([k,n])=>`<button role="tab" data-tab="${k}" aria-selected="${k===tab}">${n}</button>`).join(''):'';
+ $('#drawer').hidden=false; drawView();
+}
+function drawView(){
+ const B=$('#dBody');
+ if(view==='plan') B.innerHTML=tab==='oly'?olyHTML():planHTML();
+ if(view==='progress') B.innerHTML=progressHTML();
+ if(view==='settings') B.innerHTML=settingsHTML();
+ if(view==='solved'){ if(tab==='tricks') B.innerHTML=tricksHTML(); else {B.innerHTML='<div class="loading"><div class="orbit"></div>Загружаю…</div>';store.listSolved().then(a=>{if(view==='solved'&&tab==='list'){B.innerHTML=solvedHTML(a);typeset(B)}}).catch(()=>{B.innerHTML='<p class="empty">Не получилось загрузить список. Закрой панель и открой снова.</p>'})} }
+ typeset(B);
+}
+document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openView(b.dataset.open)));
+$('#drawer').addEventListener('click',e=>{
+ const a=e.target.closest('[data-act],[data-tab],[data-mark],[data-unnote],[data-unskip],[data-unqueue]'); if(!a) return;
+ const act=a.dataset.act;
+ if(act==='close'){$('#drawer').hidden=true;view=null;return}
+ if(act==='replan') return replan(a);
+ if(act==='diag') return startDiag();
+ if(a.dataset.tab){tab=a.dataset.tab;$('#dTabs').querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));drawView()}
+ if(a.dataset.mark){e.preventDefault();const id=a.dataset.mark;if(S.oly[id])delete S.oly[id];else S.oly[id]=true;
+  bump(); save(true); drawView(); const o=OLY.find(x=>x.id===id); if(S.oly[id]&&o) say(`«${o.name}» — записала. Буду подмешивать задачи в её стиле: чем ближе тур, тем чаще.`,'cool')}
+ if(a.dataset.unnote!=null){S.notes.splice(+a.dataset.unnote,1);save(true);drawView()}
+ if(a.dataset.unskip){delete S.prog.skip[a.dataset.unskip];bump();save(true);drawView()}
+ if(a.dataset.unqueue!=null){S.prog.queue.splice(+a.dataset.unqueue,1);bump();save(true);drawView()}
+});
+$('#drawer').addEventListener('change',e=>{if(e.target.name==='tier'){S.set.tier=e.target.value;save(true)}if(e.target.id==='apiKey')setKey(e.target.value.trim())});
+addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#drawer').hidden){$('#drawer').hidden=true;view=null}});
+
+async function replan(btn){
+ if(!sample||!toolsOK){planReply='Пересобирать план я могу, когда в «Настройках» есть API-ключ.';return drawView()}
+ btn.disabled=true; btn.textContent='Си думает…'; mood('load');
+ const h=S.hist.slice(-15).map(x=>`${x.k}:${x.d}/10→${Math.round(x.s*100)}%`).join(', ');
+ const mk=OLY.filter(o=>S.oly[o.id]&&!o.off).map(o=>{const r=nextRoundAfter(o);return `${o.name}${r?' ('+r.st.t+' через '+r.days+' дн)':''}`}).join('; ');
+ const h14=S.hist.filter(x=>Date.now()-x.t<14*DAY);
+ const log=[];
+ try{
+  const r=await sample(`Ты — Си, репетитор по физике. Пересмотри учебную программу ученика по его данным и измени её инструментами, если это обосновано: уровни тем, порядок, пропуски, свои темы (в том числе за рамками школы, если ученик сильный), очередь задач по твоему замыслу.
+Ученик: ${grade()} класс, Москва. Цели: ЕГЭ по физике (июнь 2028) и олимпиады${mk?': '+mk:''}.
+Всего занятий: ${fmtMin(S.total/60)}, за 7 дней: ${fmtMin(secs(7)/60)}, точность за 14 дней: ${h14.length?Math.round(avg(h14.map(x=>x.s))*100)+'%':'нет данных'}.
+Последние результаты (тема:сложность→балл): ${h||'нет'}.
+${S.notes.length?'Заметки об ученике: '+S.notes.join('; '):''}
+Сначала вызови get_program. Не ломай то, что работает. В конце напиши ученику 2–4 предложения в своём характере: что изменила и почему, или почему менять нечего.`,{modelTier:S.set.tier,cache:false,tools:liveTools(m=>log.push(m))});
+  planReply=cleanReply(r.text)+(log.length?'\n\n'+log.map(x=>'✦ '+x).join('\n'):'');
+  say(cleanReply(r.text),log.length?'cool':'watch');
+ }catch(e){planReply=errText(e);mood('sigh')}
+ save(true); if(view==='plan') drawView();
+}
+function bar(m,c){return `<div class="bar${c?' c':''}"><i style="width:${Math.round(m*100)}%"></i></div><span class="pct">${Math.round(m*100)}%</span>`}
+function planHTML(){
+ const f=frontier(); const now=Date.now(), plan=PLAN();
+ let h=`<div class="planbtns"><button class="btn primary" data-act="replan" ${sample&&toolsOK?'':'disabled'}>Си, пересобери план</button><button class="btn" data-act="diag" ${sample?'':'disabled'}>Проверить уровень заново</button></div>`;
+ if(planReply) h+=`<div class="sireply"><span class="eyebrow">Си</span><div>${fmt(planReply)}</div></div>`;
+ if(S.diag) h+=`<div class="now"><span class="eyebrow">Идёт диагностика</span><h3>Осталось до ${S.diag.queue.length} ${plural(S.diag.queue.length,'задачи','задач','задач')}</h3><p>После неё программа подстроится под твой уровень.</p></div>`;
+ h+=f?`<div class="now"><span class="eyebrow">Сейчас изучаем</span><h3>${esc(f.n)}${f.custom?'<span class="tagc">своя</span>':''}</h3><p>${esc(SECTIONS[f.s]||'')}${f.g>grade()?' · в школе это '+f.g+' класс, ты впереди':''} · освоено ${Math.round(mastery(f.id)*100)}%</p></div>`
+  :`<div class="now"><span class="eyebrow">Программа пройдена</span><h3>Теперь повторение и олимпиады</h3></div>`;
+ if(S.prog.queue.length) h+=`<div><h4>Задачи от Си</h4><ul class="list notes">${S.prog.queue.map((q,i)=>`<li><span>${esc(byId(q.skill)?.n||q.skill)} ×${q.n}<br><span class="small">${esc(q.note)}</span></span><button data-unqueue="${i}" aria-label="Убрать">×</button></li>`).join('')}</ul></div>`;
+ const next=plan.filter(k=>!introduced(k)&&k!==f).slice(0,6);
+ if(next.length) h+=`<div><h4>Дальше</h4><ol class="list">${next.map((k,i)=>`<li><span class="n">${i+1}</span><span class="${unlocked(k)?'':'lock'}">${esc(k.n)}${k.custom?'<span class="tagc">своя</span>':''}${unlocked(k)?'':' · сначала: '+esc(k.p.filter(p=>!(S.sk[p]?.n>=2&&mastery(p)>=.35)).map(p=>byId(p)?.n).join(', '))}</span><span></span></li>`).join('')}</ol></div>`;
+ const due=plan.filter(k=>S.sk[k.id]?.n&&S.sk[k.id].due<=now);
+ if(due.length) h+=`<div><h4>Пора повторить</h4><ul class="list">${due.map(k=>`<li><span class="n">↺</span><span>${esc(k.n)}</span>${bar(mastery(k.id))}</li>`).join('')}</ul></div>`;
+ const side=SQ.filter(unlocked);
+ h+=`<div><h4>За рамками программы</h4><p class="small">Чем больше решаешь за один заход, тем сложнее и интереснее задачи — и тем чаще в них появляются идеи отсюда.</p>${side.length?`<ul class="list">${side.map(q=>`<li><span class="n">✦</span><span>${esc(q.n)}</span><span class="pct">${S.sk[q.id]?.n?'видел '+S.sk[q.id].n+'×':'ещё нет'}</span></li>`).join('')}</ul>`:'<p class="small">Откроются, когда освоишь первые темы.</p>'}</div>`;
+ const secs2={...SECTIONS}; if(S.prog.custom.some(k=>!SECTIONS[k.s])) secs2.oly=SECTIONS.oly;
+ h+=`<div><h4>Вся программа</h4>${Object.entries(secs2).map(([s,n])=>{const ks=plan.filter(k=>k.s===s);if(!ks.length)return '';return `<details class="sec"><summary><span>${esc(n)}</span>${bar(avg(ks.map(k=>mastery(k.id))))}</summary>${ks.map(k=>`<div class="skrow ${S.sk[k.id]?.n?'on':''}"><span>${esc(k.n)}${k.custom?'<span class="tagc">своя</span>':''}${k.e.length?' <span class="small">· №'+k.e.join(', ')+'</span>':''}</span>${bar(mastery(k.id))}</div>`).join('')}</details>`}).join('')}</div>`;
+ const sk2=Object.keys(S.prog.skip);
+ if(sk2.length) h+=`<div><h4>Убрано из программы</h4><ul class="list notes">${sk2.map(id=>`<li><span>${esc(byId(id)?.n||id)}</span><button data-unskip="${esc(id)}" aria-label="Вернуть">↺</button></li>`).join('')}</ul></div>`;
+ h+=`<p class="small">По умолчанию порядок школьный: в 10 классе механика, молекулярная физика, электростатика и ток; в 11 — магнетизм, оптика, кванты. Календаря нет: следующая тема открывается, когда текущая освоена, а к новой теме я сначала даю урок. Попроси меня в чате — и я переставлю темы, добавлю свои или составлю серию задач.</p>`;
+ return h;
+}
+function olyHTML(){
+ let h='';
+ if(RULES) h+=`<div class="rules"><b>${esc(RULES.title||'Льготы')}</b>${RULES.points?.length?`<ul>${RULES.points.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${RULES.checked?`<p class="small">Проверено ${esc(RULES.checked)}</p>`:''}</div>`;
+ if(!OLY.length) return h+`<p class="empty">Список олимпиад не загрузился (data.json).</p>`;
+ const rows=OLY.map(o=>({o,nx:o.off?null:nextEvent(o)})).sort((a,b)=>(!!S.oly[b.o.id]-!!S.oly[a.o.id])||((a.o.off?1:0)-(b.o.off?1:0))||((a.nx?.at??9e15)-(b.nx?.at??9e15)));
+ h+=`<p class="small">Отметь «Буду участвовать» — я начну готовить тебя к этой олимпиаде, и чем ближе тур, тем больше задач в её стиле.</p>`;
+ h+=rows.map(({o,nx})=>{
+  const m=!!S.oly[o.id], lv=o.level==='ВсОШ'?'<span class="lvl lv">ВсОШ</span>':o.level?`<span class="lvl ${o.level==1?'l1':''}">${o.level} ур.</span>`:'';
+  const nxt=o.off?esc(o.note||'В этом сезоне не проводится'):nx?`${esc(nx.st.t)}: <b>${rdate(nx.st.from)}${nx.st.to&&nx.st.to!==nx.st.from?'–'+rdate(nx.st.to):''}</b> · ${nx.now?'<span class="soon">идёт сейчас</span>':`<span class="${nx.days<=14?'soon':''}">через ${nx.days} ${plural(nx.days,'день','дня','дней')}</span>`}${nx.st.tbd?' · ориентировочно':''}`:'Этапы сезона прошли';
+  const t0=pdate(today()).getTime();
+  return `<details class="oly ${m?'marked':''} ${o.off?'off':''}"><summary><span class="oname">${esc(o.name)}${lv}</span>${o.off?'':`<button class="mark" data-mark="${esc(o.id)}" aria-pressed="${m}">${m?'Участвую':'Буду участвовать'}</button>`}<span class="onext">${nxt}</span></summary>
+  <div class="obody">
+   ${o.org?`<div class="small">${esc(o.org)}${o.grades?' · '+esc(o.grades)+' кл.':''}${o.num?' · №'+esc(o.num)+' в Перечне':''}</div>`:''}
+   ${o.format?`<div>${esc(o.format)}</div>`:''}
+   ${o.stages?.length?`<table class="stages">${o.stages.map(s=>`<tr class="${pdate(s.to||s.from).getTime()<t0?'past':''}"><td>${rdate(s.from)}${s.to&&s.to!==s.from?'–'+rdate(s.to):''}</td><td>${esc(s.t)}${s.tbd?' (ориентировочно)':''}</td></tr>`).join('')}</table>`:''}
+   ${o.how?.length?`<div><h4>Как участвовать</h4><ul>${o.how.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
+   ${o.perks?`<div><h4>Что даёт</h4>${esc(o.perks)}</div>`:''}
+   ${o.unis?.length?`<div><h4>Где действует</h4><ul>${o.unis.map(u=>`<li><b>${esc(u.u)}</b> — ${esc(u.v)}</li>`).join('')}</ul></div>`:''}
+   ${m&&!o.off?`<div class="small">Готовность по темам олимпиады: ${Math.round(olyReadiness(o)*100)}%</div>`:''}
+   ${/^https:\/\//.test(o.site||'')?`<a href="${esc(o.site)}" target="_blank" rel="noopener">${esc(o.site.replace(/^https:\/\//,''))}</a>`:''}
+   ${o.checked?`<div class="small">Данные проверены ${esc(o.checked)}</div>`:''}
+  </div></details>`}).join('');
+ return h;
+}
+function calHTML(){
+ const end=pdate(today()), dow=(end.getDay()+6)%7, start=new Date(end.getFullYear(),end.getMonth(),end.getDate()-dow-25*7);
+ let c='';
+ for(let i=0;i<26*7;i++){const d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i);
+  if(d>end){c+='<i class="fut"></i>';continue}
+  const m=(S.days[dkey(d)]||0)/60, l=m<=0?0:m<15?1:m<30?2:m<60?3:4;
+  c+=`<i class="l${l}" title="${d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}: ${m?fmtMin(m):'нет занятий'}"></i>`}
+ return `<div class="calwrap"><div class="cal" role="img" aria-label="Занятия за полгода">${c}</div></div><div class="legend">меньше <i style="background:rgba(255,255,255,.06)"></i><i style="background:rgba(255,191,105,.28)"></i><i style="background:rgba(255,191,105,.5)"></i><i style="background:rgba(255,191,105,.75)"></i><i style="background:var(--comet)"></i> больше</div>`;
+}
+function progressHTML(){
+ const v=verdict(), e=egeEstimate();
+ let h=`<div class="stats"><div class="stat"><b>${(S.total/3600).toFixed(1).replace('.',',')}</b><span>часов всего</span></div><div class="stat"><b>${fmtMin(secs(7)/60)}</b><span>за 7 дней</span></div><div class="stat"><b>${S.solvedN||0}</b><span>задач решено</span></div><div class="stat"><b>${S.tricks.length}</b><span>приёмов</span></div></div>`;
+ h+=`<div class="vbox ${v.tier}"><span class="eyebrow">Си о тебе</span><div>${esc(v.text)}</div></div>`;
+ h+=`<div><h4>Полгода занятий</h4>${calHTML()}<p class="small">Нужный темп сейчас: ~${fmtMin(needMinWeek())} в неделю. Считаю по оставшимся темам до ЕГЭ и по отмеченным олимпиадам. Регулярность не требую — важен объём.</p></div>`;
+ h+=`<div><h4>ЕГЭ: прогноз сегодня</h4><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center"><div class="bar c"><i style="width:${Math.round(e/45*100)}%"></i></div><b style="font-family:var(--f-mono)">≈ ${e} / 45</b></div><p class="small">Первичные баллы: оценка по твоей точности в каждой теме против сложности заданий. Шкалу перевода в 100-балльную ФИПИ публикует отдельно.</p></div>`;
+ h+=`<div><h4>По разделам</h4><ul class="list">${Object.entries(SECTIONS).map(([s,n])=>`<li><span class="n"></span><span>${esc(n)}</span>${bar(avg(PLAN().filter(k=>k.s===s).map(k=>mastery(k.id))))}</li>`).join('')}</ul></div>`;
+ const mk=OLY.filter(o=>S.oly[o.id]&&!o.off);
+ if(mk.length) h+=`<div><h4>Готовность к олимпиадам</h4><ul class="list">${mk.map(o=>`<li><span class="n"></span><span>${esc(o.name)}</span>${bar(olyReadiness(o),1)}</li>`).join('')}</ul></div>`;
+ return h;
+}
+function solvedHTML(a){
+ if(!a.length) return '<p class="empty">Здесь появятся решённые задачи — с условием, решением и приёмом.</p>';
+ const lab={first:['с первого раза','first'],help:['с подсказкой или попытками','help'],gave:['сдался','gave']};
+ return `<div class="solved">${a.map(p=>{const k=byId(p.skill),[t,c]=lab[p.status]||['',''];return `<details><summary><span>${esc(p.title)}</span><span class="res ${c}">${t}</span><span class="d">${new Date(p.done).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})} · ${esc(k?k.n:'')}${p.task?' · ЕГЭ №'+p.task:''} · ${p.d}/10</span></summary><div class="read">${p.intro?fmt(p.intro)+'<br><br>':''}${fmt(p.text)}<br><br><b>Ответ:</b> ${esc(p.type==='explain'?'—':p.answer+' '+(p.unit||''))}<br><br>${fmt(p.solution)}${p.trick?`<br><br><b>Приём:</b> ${esc(p.trick.name)} — ${esc(p.trick.idea)}`:''}</div></details>`}).join('')}</div>`;
+}
+function tricksHTML(){
+ if(!S.tricks.length) return '<p class="empty">Каждая задача приносит новый приём. Здесь будет твоя копилка.</p>';
+ return `<ul class="list">${[...S.tricks].reverse().map(t=>`<li style="grid-template-columns:22px minmax(0,1fr)"><span class="n">✦</span><span><b>${esc(t.n)}</b><br><span class="small">${esc(t.i)}</span></span></li>`).join('')}</ul>`;
+}
+function settingsHTML(){
+ return `<div><h4>Ключ API Anthropic</h4><input class="key" type="password" id="apiKey" value="${esc(apiKey())}" placeholder="sk-ant-…" autocomplete="off" aria-label="Ключ API Anthropic"><p class="small">Хранится только в этом браузере и уходит напрямую в api.anthropic.com. Получить: console.anthropic.com.</p></div>
+ <div><h4>Модель Си</h4><div class="tier">${Object.entries({quick:'Быстрая — отвечает мгновенно, но в сложных задачах ошибается чаще.',default:'Обычная — хороший баланс. Рекомендую.',complex:'Сильная — для олимпиадных задач и пересборки плана: думает дольше и расходует больше лимита.'}).map(([k,d])=>`<label><input type="radio" name="tier" value="${k}" ${S.set.tier===k?'checked':''}><span><b>${TIERS[k]}</b><br><span class="small">${d}</span></span></label>`).join('')}</div></div>
+ <div><h4>Что Си знает о тебе</h4>${S.notes.length?`<ul class="list notes">${S.notes.map((n,i)=>`<li><span>${esc(n)}</span><button data-unnote="${i}" aria-label="Забыть">×</button></li>`).join('')}</ul>`:'<p class="small">Пока ничего. Заметки появляются, когда ты обсуждаешь со мной задачи. Ими я подстраиваю новые задачи и уроки под тебя.</p>'}</div>
+ <div><h4>Экономия лимита</h4><p class="small">Проверка ответов, план, олимпиады и прогресс считаются на странице и не тратят лимит. Я трачу его на новую задачу (одна заранее, пока ты читаешь решение), на урок по новой теме (один раз — потом он сохранён), на ответы в чате и на пересборку плана — только когда ты просишь.</p></div>
+ <p class="small">Прогресс хранится только в этом браузере.</p>`;
+}
+
+/* ---------- звёзды ---------- */
+(function(){
+ const c=$('#sky'), x=c.getContext('2d'), still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ let W,H,dpr,stars=[],shoot=null,raf=0;
+ function size(){dpr=Math.min(2,devicePixelRatio||1);W=c.width=innerWidth*dpr;H=c.height=innerHeight*dpr;
+  stars=Array.from({length:Math.round(innerWidth*innerHeight/1700)},()=>({x:Math.random()*W,y:Math.random()*H,r:(Math.random()**3*1.5+.35)*dpr,a:Math.random()*.6+.25,f:Math.random()*1.8+.4,p:Math.random()*6.3,h:Math.random()}))}
+ function draw(t){
+  x.clearRect(0,0,W,H);
+  for(const s of stars){x.globalAlpha=still?s.a:s.a*(.6+.4*Math.sin(t/1000*s.f+s.p));x.fillStyle=s.h>.93?'#ffd9a0':s.h>.86?'#a9dcff':'#ffffff';x.beginPath();x.arc(s.x,s.y,s.r,0,6.283);x.fill()}
+  if(!still){
+   if(!shoot&&Math.random()<.0015) shoot={x:W*(.3+Math.random()*.7),y:H*Math.random()*.35,l:0};
+   if(shoot){const k=shoot.l*16*dpr,hx=shoot.x-k,hy=shoot.y+k*.45,g=x.createLinearGradient(hx,hy,hx+110*dpr,hy-50*dpr);
+    g.addColorStop(0,'rgba(255,240,220,.9)');g.addColorStop(1,'rgba(255,240,220,0)');x.globalAlpha=1-shoot.l/45;x.strokeStyle=g;x.lineWidth=1.6*dpr;
+    x.beginPath();x.moveTo(hx,hy);x.lineTo(hx+110*dpr,hy-50*dpr);x.stroke();if(++shoot.l>45)shoot=null}
+   raf=requestAnimationFrame(draw);
+  }
+  x.globalAlpha=1;
+ }
+ size(); draw(0);
+ addEventListener('resize',()=>{size();if(still)draw(0)});
+ document.addEventListener('visibilitychange',()=>{cancelAnimationFrame(raf);if(!still&&!document.hidden)raf=requestAnimationFrame(draw)});
+})();
+
+/* ---------- запуск ---------- */
+S.cur=newProblem({...STARTER}); render(); say(STARTER.hello,'watch');
+(async function boot(){
+ sample=apiKey()?SAMPLE:null; toolsOK=!!sample;
+ let saved=null; try{saved=await store.load()}catch(e){console.warn('load',e)}
+ if(saved){const draft=S.cur.draft; S=Object.assign(fresh(),saved); S.set=Object.assign({tier:'default'},S.set); S.prog=Object.assign(freshProg(),S.prog||{}); if(!S.cur){S.cur=newProblem({...STARTER});S.cur.draft=draft}}
+ ready=true; renderHours(); render(); greet();
+ fetch('data.json').then(r=>r.json()).then(d=>{OLY=d.olympiads;RULES=d.rules;if(view==='plan'||view==='progress')drawView()}).catch(e=>console.warn('data',e));
+ if(window.MathJax?.startup?.promise) MathJax.startup.promise.then(()=>render());
+})();
+</script>
+
+</body></html>
